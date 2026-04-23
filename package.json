@@ -1,0 +1,23 @@
+{
+  "name": "apex-cli",
+  "version": "2.0.0",
+  "description": "APEX — Autonomous Perplexity EXecution CLI by GlacierEQ",
+  "type": "module",
+  "bin": {
+    "apex": "./apex.js",
+    "perplexity": "./apex.js"
+  },
+  "scripts": {
+    "start": "node apex.js",
+    "dev": "node --watch apex.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["apex", "cli", "ai", "perplexity", "legal", "hawaii"],
+  "author": "GlacierEQ / Casey Barton",
+  "license": "MIT"
+}
