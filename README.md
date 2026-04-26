@@ -1,65 +1,79 @@
-# APEX CLI v3.0.0 — MAXIMUM INTELLIGENCE EDITION
+# APEX CLI
+## Unified Legal-Ops Terminal | Case 1FDV-23-0001009 | Barton v. [OP]
 
-> **Autonomous Perplexity EXecution Engine**  
-> Claude · GitHub · Supabase · Legal Intelligence · Persistent Memory
+> **Win condition:** Reunification with Kekoa. Federal escalation (§1983 / RICO) active.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-teal.svg)](https://github.com/GlacierEQ/apex-cli)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org)
+---
 
-## 🚀 Install
+## Install
 
 ```bash
 git clone https://github.com/GlacierEQ/apex-cli
-cd apex-cli && npm install && chmod +x apex.js && npm link
+cd apex-cli
+npm install
+cp .env.example .env   # add GEMINI_API_KEY
 ```
 
-## ⚡ Quick Start
-
-```bash
-apex
-> /key sk-ant-...
-> /ghkey ghp_...
-> /sburl https://your-project.supabase.co
-> /sbkey eyJ...
-> /case
-```
-
-## 🧠 AI Commands
-
-| Command | Description |
-|---------|-------------|
-| `/case` | **War room brief** — 1FDV-23-0001009 P0/P1/P2 tactics |
-| `/legal [topic]` | Hawaii + federal legal analysis |
-| `/motion [type]` | Draft legal motion (Hawaii Family Court) |
-| `/timeline` | SOL watchpoints + deadline calendar |
-| `/strategy` | Strategic war room — 3-move chess |
-| `/code [task]` | Production code generation |
-| `/apex [task]` | Full APEX orchestration |
-| `/intel [topic]` | Intelligence brief |
-| `/daily` | Daily APEX briefing |
-| `/scan` | System audit + gap analysis |
-| `/analyze [topic]` | Deep multi-dimensional analysis |
-
-## 🔌 Integrations
-
-| Command | Description |
-|---------|-------------|
-| `/github repos` | GlacierEQ repos |
-| `/github issues [owner/repo]` | Open issues |
-| `/github commits [owner/repo]` | Recent commits |
-| `/github search [query]` | Search repos |
-| `/github create-issue [title]` | Create issue |
-| `/db select [table]` | Query Supabase |
-| `/memory show\|remember\|clear` | Persistent memory |
-| `/run [command]` | Shell execution |
-
-## ⚖️ Legal Context
-
-- **Case**: 1FDV-23-0001009 · Hawaii Family Court
-- **Federal**: 42 U.S.C. §1983 · RICO 18 U.S.C. §1961-1968
-- **Hawaii**: HRS §601-7 · §571-46 · §571-46.4
-- **SOL**: §1983=2yr · RICO=4yr · HRS family=5yr
-- **Goal**: Reunification with Kekoa
+Get a free Gemini API key: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ---
-*APEX v3 — Justice never sleeps. For Kekoa.*
+
+## Gemini Commands
+
+```bash
+# Interactive REPL (Gemini 2.0 Flash by default)
+npm run gemini
+
+# REPL with Gemini Pro (deep reasoning, motion drafting)
+npm run gemini:pro
+
+# Daily tactical brief from tactical-plan.json
+npm run gemini:daily
+
+# Analyze a file
+npm run analyze -- --file hearing.txt --task summarize
+
+# Pipe a document
+cat exhibit.txt | npm run analyze -- --task exhibit-review
+
+# Legal research (Gemini Pro)
+npm run research -- --query "HRCP 60(b) standard Hawaii Family Court"
+
+# Draft a motion section
+npm run draft -- --query "Relief under HRS 571-46 best-interest factors"
+```
+
+## REPL Commands
+
+| Command   | Action |
+|-----------|--------|
+| `/model`  | Toggle flash ↔ pro |
+| `/clear`  | Clear conversation history |
+| `/status` | Print case status snapshot |
+| `/exit`   | Quit |
+
+---
+
+## Multi-Model Router
+
+| Task | Model | Speed |
+|------|-------|-------|
+| `chat`, `triage`, `summarize`, `analyze`, `exhibit-review` | gemini-2.0-flash | Fast |
+| `draft`, `research`, `motion-section`, `federal-memo` | gemini-2.0-pro-exp | Deep |
+
+---
+
+## APEX Ecosystem
+
+- [apex-connector-registry](https://github.com/GlacierEQ/apex-connector-registry) — 15-connector fabric
+- [apex-obsidian-vault](https://github.com/GlacierEQ/apex-obsidian-vault) — litigation codex
+- [apex-taskade-connector](https://github.com/GlacierEQ/apex-taskade-connector) — task automation
+
+---
+
+## Governing Law Stack
+
+XIV Amend. · §1983 · RICO · *Troxel* · *Santosky* · *Stanley*  
+9th Cir: *Wallis* · *Keates* · *Moreland* · *H.J. Inc.*  
+HRS §571-46 · §571-46.4 · §92F · HRE 901 · HRCP 60(b) · HPR 9  
+HRPC 3.3 · 8.3 · 8.4
