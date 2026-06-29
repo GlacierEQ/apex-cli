@@ -1,0 +1,72 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# Deploy Stealth Claw with symlinked knowledge
+set -euo pipefail
+
+AGENT_NAME="stealth-claw-$(date +%s)"
+DEPLOY_DIR="$HOME/.apex_automation/agents/$AGENT_NAME"
+STEALTH_SRC="$HOME/MISSIONS/CONSOLIDATED/AI_AGENTS/PRO_AGENTS/Stealth-Claw/stealth_claw"
+OMNI_MODEL="stealth-claw"
+PORT="${1:-8080}"
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║     STEALTH CLAW DEPLOYMENT — OFF-PREM          ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Create workspace
+mkdir -p "$DEPLOY_DIR/workspace" "$DEPLOY_DIR/logs"
+
+# Symlink knowledge
+ln -sf "$HOME/.agents/skills" "$DEPLOY_DIR/skills"
+ln -sf "$HOME/MEMORY.md" "$DEPLOY_DIR/MEMORY.md"
+ln -sf "$HOME/AGENTS.md" "$DEPLOY_DIR/AGENTS.md"
+ln -sf "$STEALTH_SRC/claw_core.py" "$DEPLOY_DIR/claw_core.py"
+ln -sf "$STEALTH_SRC/parallel_executor.py" "$DEPLOY_DIR/parallel_executor.py"
+
+# Symlink MEMORY-INTERFACE for holographic memory access
+ln -sf "$HOME/MISSIONS/CONSOLIDATED/INFRASTRUCTURE/colossus-gateway/MEMORY-INTERFACE.py" "$DEPLOY_DIR/memory_interface.py"
+
+echo -e "${GREEN}✅ Agent: $AGENT_NAME${NC}"
+echo -e "   Knowledge: symlinked (28 skills)"
+echo -e "   Stealth Claw: linked from $STEALTH_SRC"
+echo -e "   Model: $OMNI_MODEL (local Ollama)"
+echo ""
+
+# Create deployment config
+cat > "$DEPLOY_DIR/config.json" << EOF
+{
+  "agent": "$AGENT_NAME",
+  "type": "stealth-claw",
+  "model": "$OMNI_MODEL",
+  "pillars": ["legal", "forensic", "operations", "memory", "delivery"],
+  "silent_mode": true,
+  "case_id": "1FDV-23-0001009",
+  "deployed_at": "$(date -Iseconds)",
+  "knowledge_source": "symlink",
+  "off_premises": true
+}
+EOF
+
+echo -e "${CYAN}Config: $DEPLOY_DIR/config.json${NC}"
+echo ""
+
+# Check if Ollama model exists
+if ollama list 2>/dev/null | grep -q "$OMNI_MODEL"; then
+    echo -e "${GREEN}✅ Model $OMNI_MODEL found in Ollama${NC}"
+else
+    echo -e "${RED}⚠  Model $OMNI_MODEL not found. Available:${NC}"
+    ollama list 2>/dev/null | head -10
+fi
+
+echo ""
+echo -e "${CYAN}To run:${NC}"
+echo -e "  cd $DEPLOY_DIR"
+echo -e "  python3 claw_core.py"
+echo ""
+echo -e "${CYAN}Or via Ollama:${NC}"
+echo -e "  ollama run $OMNI_MODEL 'Execute placeholder scan on ~/MISSIONS'"

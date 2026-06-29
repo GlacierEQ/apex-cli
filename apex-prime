@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Universal memory prime — Grok, ChatGPT, Perplexity, any agent.
+set -euo pipefail
+HOME_DIR="${HOME:-/data/data/com.termux/files/home}"
+[[ -f "$HOME_DIR/.gemini_keys" ]] && source "$HOME_DIR/.gemini_keys"
+export PATH="$HOME_DIR/bin:$PATH"
+
+QUERY="${*:-apex operator session startup context}"
+OUT="$HOME_DIR/.supermemory/ops/live-context.md"
+
+CTX="$(sm-ops prime "$QUERY")"
+{
+  echo "$CTX"
+  echo ""
+  echo "---"
+  echo "primed_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "query: $QUERY"
+} > "$OUT"
+
+ln -sf "$OUT" "$HOME_DIR/APEX_COMMAND_CENTER/LIVE_MEMORY_CONTEXT.md" 2>/dev/null || true
+
+if command -v termux-clipboard-set >/dev/null 2>&1; then
+  termux-clipboard-set < "$OUT" 2>/dev/null && echo "Copied to clipboard — paste into ChatGPT or Perplexity" >&2 || true
+fi
+
+echo "$CTX"

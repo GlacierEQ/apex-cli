@@ -1,0 +1,158 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# APEX Forensic Operations Center
+# Unified CLI for all forensic operations
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+FORENSICS="$HOME/MISSIONS/CONSOLIDATED/FORENSICS"
+SCRIPTS="$FORENSICS/SCRIPTS"
+EVIDENCE="$HOME/MISSIONS/CONSOLIDATED/EVIDENCE_VAULT"
+CHAIN="$FORENSICS/CHAIN_OF_CUSTODY"
+REPORTS="$FORENSICS/REPORTS"
+
+show_help() {
+  cat << 'EOF'
+APEX Forensic Operations Center
+
+Usage: apex-forensics <command> [options]
+
+Commands:
+  ingest <file>        Ingest evidence with chain-of-custody
+  verify <file>        Verify evidence integrity
+  verify-all           Verify all evidence chains
+  scan <dir>           Scan directory for forensic analysis
+  chain <evidence_id>  View chain of custody
+  report               Generate evidence report
+  status               Show forensic operations status
+  search <query>       Search evidence catalog
+
+Examples:
+  apex-forensics ingest ~/evidence/document.pdf --type document
+  apex-forensics verify ~/evidence/document.pdf
+  apex-forensics scan ~/evidence/
+  apex-forensics chain EV-abc123def456
+  apex-forensics report
+EOF
+}
+
+cmd_ingest() {
+  local file="$1"
+  local type="${2:-document}"
+  local desc="${3:-}"
+  
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Forensic Evidence Ingestion"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/forensic_evidence_processor.py" ingest "$file" --type "$type" --description "$desc"
+}
+
+cmd_verify() {
+  local file="$1"
+  
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Forensic Evidence Verification"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/forensic_evidence_processor.py" verify "$file"
+}
+
+cmd_verify_all() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Batch Evidence Verification"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/hash_chain_verifier.py" verify-all
+}
+
+cmd_scan() {
+  local dir="$1"
+  
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Forensic File System Analysis"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/forensic_fs_analyzer.py" "$dir"
+}
+
+cmd_chain() {
+  local evidence_id="$1"
+  
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Chain of Custody"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/hash_chain_verifier.py" report "$evidence_id"
+}
+
+cmd_report() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Forensic Evidence Report"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  python3 "$SCRIPTS/forensic_evidence_processor.py" report
+}
+
+cmd_status() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Forensic Operations Status"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "📁 Directory Structure:"
+  echo "   FORENSICS: $(du -sh "$FORENSICS" 2>/dev/null | awk '{print $1}')"
+  echo "   EVIDENCE_VAULT: $(du -sh "$EVIDENCE" 2>/dev/null | awk '{print $1}')"
+  echo "   CHAIN_OF_CUSTODY: $(du -sh "$CHAIN" 2>/dev/null | awk '{print $1}')"
+  echo "   REPORTS: $(du -sh "$REPORTS" 2>/dev/null | awk '{print $1}')"
+  
+  echo ""
+  echo "📊 Evidence Items:"
+  echo "   Total: $(find "$EVIDENCE" -type f 2>/dev/null | wc -l)"
+  echo "   Chains: $(find "$CHAIN" -name "EV-*.json" 2>/dev/null | wc -l)"
+  echo "   Reports: $(find "$REPORTS" -name "*.md" 2>/dev/null | wc -l)"
+  
+  echo ""
+  echo "🔧 Tools Available:"
+  echo "   forensic_evidence_processor.py"
+  echo "   forensic_fs_analyzer.py"
+  echo "   hash_chain_verifier.py"
+}
+
+cmd_search() {
+  local query="$1"
+  
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Evidence Search: $query"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "🔍 Chain of Custody:"
+  grep -l "$query" "$CHAIN"/EV-*.json 2>/dev/null | head -10
+  
+  echo ""
+  echo "📁 Evidence Vault:"
+  grep -rl "$query" "$EVIDENCE" 2>/dev/null | head -10
+  
+  echo ""
+  echo "📄 Reports:"
+  grep -rl "$query" "$REPORTS" 2>/dev/null | head -10
+}
+
+case "${1:-help}" in
+  ingest)      cmd_ingest "${2:-}" "${3:-document}" "${4:-}" ;;
+  verify)      cmd_verify "${2:-}" ;;
+  verify-all)  cmd_verify_all ;;
+  scan)        cmd_scan "${2:-}" ;;
+  chain)       cmd_chain "${2:-}" ;;
+  report)      cmd_report ;;
+  status)      cmd_status ;;
+  search)      cmd_search "${2:-}" ;;
+  help|*)      show_help ;;
+esac

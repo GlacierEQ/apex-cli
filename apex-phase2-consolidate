@@ -1,0 +1,182 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# APEX Phase 2 Consolidation
+# Remaining: AEON_VAULT, SUPPORTING_DATA, TOOLS, small dirs
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+CONSOLIDATED="$HOME/MISSIONS/CONSOLIDATED"
+
+echo "═══════════════════════════════════════════════════════════════"
+echo " APEX Phase 2 Consolidation"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+# Step 1: Consolidate AEON_777 subdirectories
+echo "📁 Step 1: Consolidating AEON_777 subdirectories..."
+mkdir -p "$CONSOLIDATED/AI_AGENTS/AEON_777"
+
+for item in AEON_VAULT Pro-AEON-777 aionui; do
+  src="$HOME/MISSIONS/AEON_777/$item"
+  dst="$CONSOLIDATED/AI_AGENTS/AEON_777/$item"
+  if [ -d "$src" ] && [ ! -L "$src" ] && [ ! -d "$dst" ]; then
+    mv "$src" "$dst"
+    ln -sf "$dst" "$src"
+    echo "   ✅ $item consolidated + symlinked"
+  fi
+done
+
+# Step 2: Consolidate SUPPORTING_DATA
+echo ""
+echo "📁 Step 2: Consolidating SUPPORTING_DATA (3.5GB)..."
+SD="$HOME/MISSIONS/SUPPORTING_DATA"
+mkdir -p "$CONSOLIDATED/SUPPORT_DATA"
+
+for item in scratch_gmail UNSORTED SECRETS_AUDIT LAW_LIBRARY manifests nix-environments ish-repo security electricity Glacier-Skillset MEMORY_OPS OPERATOR_SCRIPTS SKILLS skills_dist xAI_MASTER_PITCH; do
+  src="$SD/$item"
+  dst="$CONSOLIDATED/SUPPORT_DATA/$item"
+  if [ -d "$src" ] && [ ! -L "$src" ] && [ ! -d "$dst" ]; then
+    mv "$src" "$dst"
+    ln -sf "$dst" "$src"
+    echo "   ✅ $item consolidated"
+  fi
+done
+
+# Move remaining loose files
+for f in "$SD"/*.json "$SD"/*.py "$SD"/*.sh "$SD"/*.log "$SD"/*.tex "$SD"/*.pdf "$SD"/*.md "$SD"/*.vsix; do
+  if [ -f "$f" ] && [ ! -L "$f" ]; then
+    mv "$f" "$CONSOLIDATED/SUPPORT_DATA/"
+  fi
+done
+echo "   ✅ SUPPORTING_DATA consolidated"
+
+# Step 3: Consolidate TOOLS_AND_EXTENSIONS
+echo ""
+echo "📁 Step 3: Consolidating TOOLS_AND_EXTENSIONS (3GB)..."
+TE="$HOME/MISSIONS/TOOLS_AND_EXTENSIONS"
+mkdir -p "$CONSOLIDATED/TOOLS"
+
+for item in android-sdk agy.tar.gz antigravity.tar cline.vsix cline.vsix.bak continue.vsix Dockerfile jna-5.14.0.aar termux-x11.apk; do
+  src="$TE/$item"
+  dst="$CONSOLIDATED/TOOLS/$item"
+  if [ -e "$src" ] && [ ! -L "$src" ]; then
+    if [ ! -e "$dst" ]; then
+      mv "$src" "$dst"
+    else
+      rm "$src"
+    fi
+    ln -sf "$dst" "$src" 2>/dev/null || true
+  fi
+done
+echo "   ✅ TOOLS_AND_EXTENSIONS consolidated"
+
+# Step 4: Consolidate small directories
+echo ""
+echo "📁 Step 4: Consolidating small directories..."
+for dir in colossus-gateway Pro-Colossus APP_CATALOG FORENSICS; do
+  src="$HOME/MISSIONS/$dir"
+  dst="$CONSOLIDATED/INFRASTRUCTURE/$dir"
+  if [ -d "$src" ] && [ ! -L "$src" ]; then
+    mkdir -p "$CONSOLIDATED/INFRASTRUCTURE"
+    if [ ! -d "$dst" ]; then
+      mv "$src" "$dst"
+    fi
+    ln -sf "$dst" "$src"
+    echo "   ✅ $dir consolidated"
+  fi
+done
+
+# Step 5: Consolidate remaining MISSIONS loose files
+echo ""
+echo "📁 Step 5: Consolidating loose files..."
+mkdir -p "$CONSOLIDATED/ROOT_FILES"
+for f in "$HOME/MISSIONS"/*.md "$HOME/MISSIONS"/*.json "$HOME/MISSIONS"/*.py "$HOME/MISSIONS"/*.sh "$HOME/MISSIONS"/*.yml "$HOME/MISSIONS"/*.ts; do
+  if [ -f "$f" ] && [ ! -L "$f" ]; then
+    mv "$f" "$CONSOLIDATED/ROOT_FILES/"
+  fi
+done
+echo "   ✅ Loose files consolidated"
+
+# Step 6: Update index
+echo ""
+echo "📝 Step 6: Updating index..."
+cat > "$CONSOLIDATED/INDEX.md" << 'EOF'
+# APEX Consolidated — Lossless Index v2
+_Generated: 2026-06-24_
+
+## Structure
+
+```
+CONSOLIDATED/
+├── AI_AGENTS/
+│   ├── CORE_MISSION/          (16GB — canonical)
+│   ├── AEON_777/
+│   │   ├── AEON_VAULT/        (2.7GB)
+│   │   ├── Pro-AEON-777/      (161MB)
+│   │   └── aionui/            (18MB)
+│   └── PRO_AGENTS/            (1.2GB)
+│
+├── CASE_FILINGS/
+│   ├── THE_CATACLYSM/         (1.6GB)
+│   ├── CASE_STRUCTURE/        (1.4GB)
+│   └── 1FDV-23-0001009/       (case files)
+│
+├── EVIDENCE_VAULT/
+│   └── CYBERTACK/             (evidence)
+│
+├── FORENSICS/                 (16MB)
+│
+├── INFRASTRUCTURE/
+│   ├── APEX/                  (5.5GB)
+│   ├── COLOSSUS/              (colossus repos)
+│   ├── colossus-gateway/      (1.2MB)
+│   ├── Pro-Colossus/          (189KB)
+│   ├── APP_CATALOG/           (24KB)
+│   └── FORENSICS/             (16MB)
+│
+├── LEGAL_OPS/                 (1.3GB)
+│
+├── SUPPORT_DATA/              (3.5GB)
+│   ├── scratch_gmail/         (2.3GB)
+│   ├── UNSORTED/              (1.2GB)
+│   ├── SECRETS_AUDIT/         (7.1MB)
+│   ├── LAW_LIBRARY/           (145KB)
+│   └── ... (other support data)
+│
+├── TOOLS/                     (3GB)
+│   └── android-sdk/           (2.9GB)
+│
+├── ROOT_FILES/                (loose files)
+│
+└── ARCHIVE/                   (preserved backups)
+```
+
+## Symlink Map
+
+All original paths preserved:
+- ~/CORE_MISSION → CONSOLIDATED/AI_AGENTS/CORE_MISSION
+- ~/MISSIONS/AEON_777/* → CONSOLIDATED/AI_AGENTS/AEON_777/*
+- ~/MISSIONS/THE_CATACLYSM → CONSOLIDATED/CASE_FILINGS/THE_CATACLYSM
+- ~/MISSIONS/APEX_INFRASTRUCTURE → CONSOLIDATED/INFRASTRUCTURE/APEX
+- ~/MISSIONS/PRO_AGENTS → CONSOLIDATED/AI_AGENTS/PRO_AGENTS
+- ~/MISSIONS/SUPPORTING_DATA/* → CONSOLIDATED/SUPPORT_DATA/*
+- ~/MISSIONS/TOOLS_AND_EXTENSIONS/* → CONSOLIDATED/TOOLS/*
+- ~/MISSIONS/colossus-gateway → CONSOLIDATED/INFRASTRUCTURE/colossus-gateway
+- ~/MISSIONS/Pro-Colossus → CONSOLIDATED/INFRASTRUCTURE/Pro-Colossus
+- ~/MISSIONS/APP_CATALOG → CONSOLIDATED/INFRASTRUCTURE/APP_CATALOG
+- ~/MISSIONS/FORENSICS → CONSOLIDATED/INFRASTRUCTURE/FORENSICS
+EOF
+
+echo "   ✅ Index updated"
+
+# Step 7: Final size report
+echo ""
+echo "📊 Step 7: Final consolidation report..."
+echo "   📊 CONSOLIDATED total: $(du -sh "$CONSOLIDATED" 2>/dev/null | awk '{print $1}')"
+echo "   📊 MISSIONS remaining: $(du -sh "$HOME/MISSIONS" --exclude="$HOME/MISSIONS/CONSOLIDATED" 2>/dev/null | awk '{print $1}')"
+echo "   📊 Symlinks: $(find "$HOME/MISSIONS" -maxdepth 3 -type l 2>/dev/null | wc -l)"
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo " ✅ Phase 2 consolidation complete"
+echo "═══════════════════════════════════════════════════════════════"

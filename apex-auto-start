@@ -1,0 +1,36 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Auto-Start — Runs on boot, no manual intervention needed
+set -euo pipefail
+
+APEX_DIR="$HOME/.apex_automation"
+LOG_DIR="$APEX_DIR/logs"
+PID_DIR="$APEX_DIR/pids"
+mkdir -p "$LOG_DIR" "$PID_DIR"
+
+echo "[APEX] Boot sequence starting..."
+
+# 1. Start Google Drive Watcher (daemon)
+nohup python3 "$APEX_DIR/gdrive_final/gdrive_watcher.py" watch >> "$LOG_DIR/gdrive_watcher.log" 2>&1 &
+echo $! > "$PID_DIR/gdrive_watcher.pid"
+echo "[APEX] ✅ GDrive Watcher started (PID: $(cat $PID_DIR/gdrive_watcher.pid))"
+
+# 2. Start GDrive Intelligence scan (once on boot)
+python3 "$APEX_DIR/gdrive_final/gdrive_intel.py" scan >> "$LOG_DIR/gdrive_intel.log" 2>&1 &
+echo "[APEX] ✅ GDrive Intelligence scan started"
+
+# 3. Run FILEBOSS on boot
+python3 "$APEX_DIR/gdrive_final/fileboss.py" --source gdrive >> "$LOG_DIR/fileboss.log" 2>&1 &
+echo "[APEX] ✅ FILEBOSS started"
+
+# 4. Run pipeline orchestrator
+python3 "$APEX_DIR/gdrive/pipeline_orchestrator.py" all >> "$LOG_DIR/pipelines.log" 2>&1 &
+echo "[APEX] ✅ Pipelines started"
+
+# 5. Start MCP Hub (if available)
+if [ -f "$APEX_DIR/orchestrator/mcp_hub.py" ]; then
+    echo "[APEX] ✅ MCP Hub available"
+fi
+
+# 6. Log boot completion
+echo "[APEX] Boot complete at $(date)" >> "$LOG_DIR/boot.log"
+echo "[APEX] 🚀 All systems operational"

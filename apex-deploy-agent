@@ -1,0 +1,76 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Automation Runner — Deploys agents with symlinked knowledge
+# Usage: apex-deploy-agent <agent_name> <task_type>
+
+set -euo pipefail
+
+AGENT_NAME="${1:-agent-$(date +%s)}"
+TASK_TYPE="${2:-placeholder_scan}"
+AUTOMATION_DIR="$HOME/.apex_automation"
+AGENT_DIR="$AUTOMATION_DIR/agents/$AGENT_NAME"
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║       APEX AUTOMATION DEPLOYER                  ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Create agent workspace
+mkdir -p "$AGENT_DIR/workspace"
+
+# Symlink knowledge (one command, full access)
+ln -sf "$HOME/.agents/skills" "$AGENT_DIR/skills"
+ln -sf "$HOME/MEMORY.md" "$AGENT_DIR/MEMORY.md"
+ln -sf "$HOME/AGENTS.md" "$AGENT_DIR/AGENTS.md"
+
+echo -e "${GREEN}✅ Agent: $AGENT_NAME${NC}"
+echo -e "   Knowledge: symlinked"
+echo -e "   Skills: $(ls -1 "$AGENT_DIR/skills/" | wc -l) active"
+echo -e "   Task: $TASK_TYPE"
+echo ""
+
+# Create task assignment
+TASK_FILE="$AUTOMATION_DIR/tasks/${AGENT_NAME}_task.json"
+cat > "$TASK_FILE" << EOF
+{
+  "agent": "$AGENT_NAME",
+  "task_type": "$TASK_TYPE",
+  "status": "assigned",
+  "created_at": "$(date -Iseconds)",
+  "rules": {
+    "no_placeholders": true,
+    "surgical_edits": true,
+    "verify_after_change": true
+  }
+}
+EOF
+
+echo -e "   Task: $TASK_FILE"
+echo ""
+
+# Deploy based on task type
+case "$TASK_TYPE" in
+    placeholder_scan)
+        echo -e "${CYAN}Running placeholder scan...${NC}"
+        bash "$HOME/bin/apex-scan-placeholders" "$HOME" | tee "$AGENT_DIR/workspace/scan_report.txt"
+        ;;
+    test_generator)
+        echo -e "${CYAN}Test generation mode...${NC}"
+        echo "Agent will scan for code without tests and generate real tests."
+        ;;
+    skill_auditor)
+        echo -e "${CYAN}Skill audit mode...${NC}"
+        echo "Agent will audit all skills for completeness and real implementations."
+        ;;
+    *)
+        echo -e "${CYAN}Custom task: $TASK_TYPE${NC}"
+        ;;
+esac
+
+echo ""
+echo -e "${GREEN}✅ Agent $AGENT_NAME deployed.${NC}"
+echo -e "   Workspace: $AGENT_DIR/workspace/"
+echo -e "   Report: $TASK_FILE"

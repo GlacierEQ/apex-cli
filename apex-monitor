@@ -1,0 +1,79 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# APEX Memory Monitor — Watches system resources
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+THRESHOLD_DISK=85
+THRESHOLD_MEM=80
+THRESHOLD_SWAP=90
+
+check_disk() {
+  local usage=$(df /data 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%')
+  if [ "$usage" -gt "$THRESHOLD_DISK" ]; then
+    echo "⚠️  DISK: ${usage}% used (threshold: ${THRESHOLD_DISK}%)"
+    return 1
+  fi
+  echo "✅ DISK: ${usage}% used"
+  return 0
+}
+
+check_memory() {
+  local total=$(free -m 2>/dev/null | awk '/^Mem:/ {print $2}')
+  local used=$(free -m 2>/dev/null | awk '/^Mem:/ {print $3}')
+  local pct=$((used * 100 / total))
+  if [ "$pct" -gt "$THRESHOLD_MEM" ]; then
+    echo "⚠️  MEMORY: ${pct}% used (${used}MB/${total}MB)"
+    return 1
+  fi
+  echo "✅ MEMORY: ${pct}% used (${used}MB/${total}MB)"
+  return 0
+}
+
+check_swap() {
+  local total=$(free -m 2>/dev/null | awk '/^Swap:/ {print $2}')
+  local used=$(free -m 2>/dev/null | awk '/^Swap:/ {print $3}')
+  if [ "$total" -gt 0 ]; then
+    local pct=$((used * 100 / total))
+    if [ "$pct" -gt "$THRESHOLD_SWAP" ]; then
+      echo "⚠️  SWAP: ${pct}% used (${used}MB/${total}MB)"
+      return 1
+    fi
+    echo "✅ SWAP: ${pct}% used (${used}MB/${total}MB)"
+  fi
+  return 0
+}
+
+check_grok() {
+  if pgrep -f "grok_proxy.py" > /dev/null; then
+    echo "✅ GROK PROXY: Running"
+    return 0
+  else
+    echo "⚠️  GROK PROXY: Not running"
+    return 1
+  fi
+}
+
+check_sshd() {
+  if pgrep -f "sshd" > /dev/null; then
+    echo "✅ SSHD: Running"
+    return 0
+  else
+    echo "⚠️  SSHD: Not running"
+    return 1
+  fi
+}
+
+echo "═══════════════════════════════════════════════════════════════"
+echo " APEX System Monitor — $(date)"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+check_disk
+check_memory
+check_swap
+check_grok
+check_sshd
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"

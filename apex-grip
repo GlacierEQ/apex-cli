@@ -1,0 +1,241 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# apex-grip — tight grip on GlacierEQ private sovereign stack
+# status · sync · index · list
+set -euo pipefail
+
+HOME="${HOME:-/data/data/com.termux/files/home}"
+GRIP="${HOME}/.apex/SOVEREIGN_GRIP.json"
+INDEX="${HOME}/.apex/PRIVATE_REPO_INDEX.json"
+ORG="GlacierEQ"
+ACCOUNT=$(gh api user --jq .login 2>/dev/null || echo "$ORG")
+
+expand() {
+  local p="${1/#\~/$HOME}"
+  printf '%s' "$p"
+}
+
+repo_state() {
+  local path="$1"
+  if [[ "$path" == "$HOME" ]]; then
+    if git -C "$HOME" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      local branch dirty
+      branch=$(git -C "$HOME" branch --show-current 2>/dev/null || echo "?")
+      dirty=$(git -C "$HOME" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+      echo "present|${branch}|${dirty}"
+    else
+      echo "missing||"
+    fi
+    return
+  fi
+  if [[ -d "$path/.git" ]]; then
+    local branch dirty
+    branch=$(git -C "$path" branch --show-current 2>/dev/null || echo "?")
+    dirty=$(git -C "$path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    echo "present|${branch}|${dirty}"
+  else
+    echo "missing||"
+  fi
+}
+
+sync_one() {
+  local repo="$1" path="$2" shallow="${3:-1}"
+  path=$(expand "$path")
+  mkdir -p "$(dirname "$path")"
+
+  if [[ "$path" == "$HOME" ]]; then
+    if git -C "$HOME" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "pull  $repo (home)"
+      git -C "$HOME" pull --ff-only 2>/dev/null || git -C "$HOME" pull || true
+    else
+      echo "WARN  $repo — home is not a git worktree; skip"
+    fi
+    return
+  fi
+
+  if [[ -d "$path/.git" ]]; then
+    echo "pull  $repo"
+    git -C "$path" pull --ff-only 2>/dev/null || git -C "$path" pull || true
+    return
+  fi
+
+  echo "clone $repo → $path"
+  if [[ "$shallow" == "1" ]]; then
+    gh repo clone "${ORG}/${repo}" "$path" -- --depth 1
+  else
+    gh repo clone "${ORG}/${repo}" "$path"
+  fi
+}
+
+cmd_status() {
+  python3 - <<'PY' "$GRIP" "$HOME"
+import json, os, subprocess, sys
+from pathlib import Path
+
+grip_path, home = sys.argv[1], Path(sys.argv[2])
+grip = json.loads(Path(grip_path).read_text())
+
+def git_state(path: Path):
+    if not (path / ".git").exists() and path != home:
+        return "MISSING", "-", "-"
+    try:
+        b = subprocess.check_output(["git", "-C", str(path), "branch", "--show-current"], text=True).strip() or "?"
+        d = len(subprocess.check_output(["git", "-C", str(path), "status", "--porcelain"], text=True).splitlines())
+        return "ON_DISK", b, str(d)
+    except Exception:
+        return "BROKEN", "?", "?"
+
+home_git = (home / ".git").exists()
+rows = []
+for tier_id, tier in grip["tiers"].items():
+    for r in tier["repos"]:
+        p = Path(r["path"].replace("~", str(home)))
+        if p == home and home_git:
+            st, br, dirty = "HOME", subprocess.check_output(["git","-C",str(home),"branch","--show-current"], text=True).strip(), len(subprocess.check_output(["git","-C",str(home),"status","--porcelain"], text=True).splitlines())
+        else:
+            st, br, dirty = git_state(p)
+        crit = "★" if r.get("critical") else " "
+        cli = r.get("cli", "")
+        rows.append((st, crit, tier_id, r["repo"], cli, br, dirty, str(p).replace(str(home), "~")))
+
+print(f"SOVEREIGN GRIP — {grip['account']} · home={grip['home_remote']['repo']}")
+print(f"{'STATE':<10} {'':1} {'TIER':<16} {'REPO':<36} {'CLI':<12} {'BR':<12} {'Δ':<4} PATH")
+print("-" * 110)
+for st, crit, tier, repo, cli, br, dirty, path in rows:
+    print(f"{st:<10} {crit} {tier:<16} {repo:<36} {cli:<12} {br:<12} {dirty:<4} {path}")
+
+on = sum(1 for r in rows if r[0] in ("ON_DISK", "HOME"))
+miss = sum(1 for r in rows if r[0] == "MISSING")
+print("-" * 110)
+print(f"on_disk={on} missing={miss} total={len(rows)}")
+idx = Path(os.environ.get("HOME", str(home))) / ".apex/PRIVATE_REPO_INDEX.json"
+if idx.exists():
+    meta = json.loads(idx.read_text())
+    print(f"private_index={meta.get('count','?')} indexed_at={meta.get('at','?')}")
+else:
+    print("private_index=not built — run: apex-grip index")
+PY
+}
+
+cmd_list() {
+  python3 - <<'PY' "$GRIP"
+import json, sys
+from pathlib import Path
+grip = json.loads(Path(sys.argv[1]).read_text())
+for tid, tier in grip["tiers"].items():
+    print(f"[{tid}] {tier['label']}")
+    for r in tier["repos"]:
+        flags = []
+        if r.get("critical"): flags.append("critical")
+        if r.get("fork"): flags.append("fork")
+        if r.get("cli"): flags.append(r["cli"])
+        print(f"  {r['repo']:40} {r['path']:45} {' '.join(flags)}")
+PY
+}
+
+cmd_sync() {
+  local tier="" all=0 shallow=1 REPO_ONLY=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tier) tier="$2"; shift 2 ;;
+      --all) all=1; shift ;;
+      --full) shallow=0; shift ;;
+      --repo) REPO_ONLY="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  mapfile -t SYNC_LINES < <(python3 - <<'PY' "$GRIP" "$tier" "$all" "$REPO_ONLY"
+import json, os, sys
+from pathlib import Path
+grip = json.loads(Path(sys.argv[1]).read_text())
+tier_filter = sys.argv[2]
+sync_all = sys.argv[3] == "1"
+repo_only = sys.argv[4] if len(sys.argv) > 4 else ""
+
+items = []
+for tid, tier in grip["tiers"].items():
+    if tier_filter and tid != tier_filter:
+        continue
+    for r in tier["repos"]:
+        if repo_only and r["repo"] != repo_only:
+            continue
+        if sync_all or r.get("critical"):
+            items.append((r["repo"], r["path"]))
+
+for repo, path in items:
+    print(f"{repo}\t{path}")
+PY
+)
+  for line in "${SYNC_LINES[@]}"; do
+    IFS=$'\t' read -r repo path <<<"$line"
+    [[ -n "$repo" ]] || continue
+    sync_one "$repo" "$path" "$shallow"
+  done
+  echo "sync complete"
+}
+
+cmd_index() {
+  echo "indexing private repos for ${ACCOUNT}..."
+  python3 - <<'PY'
+import json, subprocess, datetime, os
+from pathlib import Path
+
+home = Path(os.environ["HOME"])
+out = home / ".apex/PRIVATE_REPO_INDEX.json"
+repos = []
+cmd = ["gh", "repo", "list", "GlacierEQ", "--limit", "1000", "--visibility", "private",
+       "--json", "name,description,pushedAt,isFork,visibility"]
+# paginate via gh
+raw = subprocess.check_output(cmd, text=True)
+data = json.loads(raw)
+for r in sorted(data, key=lambda x: x.get("pushedAt") or "", reverse=True):
+    repos.append({
+        "name": r["name"],
+        "pushedAt": r.get("pushedAt"),
+        "isFork": r.get("isFork", False),
+        "description": (r.get("description") or "")[:120],
+    })
+
+payload = {
+    "at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "account": "GlacierEQ",
+    "visibility": "private",
+    "count": len(repos),
+    "repos": repos,
+}
+out.write_text(json.dumps(payload, indent=2))
+print(f"wrote {out} count={len(repos)}")
+PY
+}
+
+usage() {
+  cat <<'EOF'
+apex-grip — tight grip on GlacierEQ private sovereign stack
+
+  apex-grip status          show on-disk vs missing (operational core)
+  apex-grip list            tiers + repos in SOVEREIGN_GRIP.json
+  apex-grip sync            pull/clone all ★ critical repos
+  apex-grip sync --tier helix
+  apex-grip sync --repo Omni_Engine
+  apex-grip sync --all      include non-critical manifest repos
+  apex-grip sync --full     full clone (not shallow)
+  apex-grip index           snapshot all 466 private repos → PRIVATE_REPO_INDEX.json
+
+manifest: ~/.apex/SOVEREIGN_GRIP.json
+EOF
+}
+
+main() {
+  local cmd="${1:-status}"
+  shift || true
+  case "$cmd" in
+    status|st) cmd_status ;;
+    list|ls) cmd_list ;;
+    sync|pull) cmd_sync "$@" ;;
+    index|reindex) cmd_index ;;
+    -h|--help|help) usage ;;
+    *) usage; exit 1 ;;
+  esac
+}
+
+main "$@"

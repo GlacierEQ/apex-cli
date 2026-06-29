@@ -1,0 +1,61 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# APEX Legal Ops — GitHub Repo Consolidation
+# Archives Z-BACKUP repos, merges duplicates
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+echo "═══════════════════════════════════════════════════════════════"
+echo " APEX Legal Ops — GitHub Repo Consolidation"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+DRY_RUN="${1:-}"
+
+# Step 1: Identify Z-BACKUP repos to archive
+echo "📦 Step 1: Identifying Z-BACKUP repos..."
+unset GITHUB_TOKEN 2>/dev/null
+BACKUP_REPOS=$(gh repo list GlacierEQ --limit 500 --json name,isPrivate --jq '.[] | select(.name | startswith("Z-BACKUP-")) | .name' 2>/dev/null)
+
+BACKUP_COUNT=$(echo "$BACKUP_REPOS" | wc -l)
+echo "   Found $BACKUP_COUNT Z-BACKUP repos"
+
+# Step 2: Identify duplicate legal brief systems
+echo ""
+echo "📦 Step 2: Identifying duplicate legal brief systems..."
+BRIEF_REPOS="legal-brief-system legal-brief-pipeline Legal-briefs-and-automatic-legal-citations-with-LawTeX-6-"
+echo "   Duplicates: $BRIEF_REPOS"
+
+# Step 3: Identify overlapping Pro-* repos
+echo ""
+echo "📦 Step 3: Identifying overlapping Pro-* repos..."
+PRO_OVERLAP=$(gh repo list GlacierEQ --limit 500 --json name,description --jq '.[] | select(.name | startswith("Pro-")) | "\(.name)\t\(.description // "")"' 2>/dev/null | grep -iE "(evidence|forensic|legal)" | head -10)
+echo "$PRO_OVERLAP"
+
+# Step 4: Archive Z-BACKUP repos (move to archive branch)
+echo ""
+echo "📦 Step 4: Archiving Z-BACKUP repos..."
+for repo in $BACKUP_REPOS; do
+  if [ "$DRY_RUN" = "--dry-run" ]; then
+    echo "   [DRY RUN] Would archive: $repo"
+  else
+    # Create archive branch and protect main
+    gh api "repos/GlacierEQ/$repo" -X PATCH -f archived=true 2>/dev/null && echo "   ✅ Archived: $repo" || echo "   ❌ Failed: $repo"
+  fi
+done
+
+# Step 5: Create consolidation summary
+echo ""
+echo "📊 Step 5: Consolidation Summary"
+echo "   Z-BACKUP repos: $BACKUP_COUNT (to archive)"
+echo "   Duplicate briefs: 3 (consolidate to 1)"
+echo "   Pro-* overlaps: 3+ (merge into aspen-grove-*)"
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+if [ "$DRY_RUN" = "--dry-run" ]; then
+  echo " 🔍 DRY RUN COMPLETE — Review above, then run without --dry-run"
+else
+  echo " ✅ Consolidation complete"
+fi
+echo "═══════════════════════════════════════════════════════════════"

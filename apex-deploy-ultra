@@ -1,0 +1,85 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# Deploy ULTRA AGENT with Omni Engine knowledge (205 skills)
+set -euo pipefail
+
+AGENT_NAME="ultra-$(date +%s)"
+DEPLOY_DIR="$HOME/.apex_automation/agents/$AGENT_NAME"
+OMNI_ENGINE="$HOME/MISSIONS/AEON_777/CORE_MISSION/AEON-BRAIN-777/02_EVIDENCE_VAULT/CONSOLIDATED_ARCHIVE/APEX_SYSTEM_BLUEPRINTS/01_OMNI_ENGINE/omni_engine/Omni_Engine-main"
+MODEL="${1:-apex-gemma4}"
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║     ULTRA AGENT — OMNI ENGINE KNOWLEDGE         ║${NC}"
+echo -e "${CYAN}║     205 skills + 32 powerups + APEX_CORE        ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+mkdir -p "$DEPLOY_DIR/workspace" "$DEPLOY_DIR/logs" "$DEPLOY_DIR/knowledge"
+
+# PRIMARY: Omni Engine (205 skills)
+ln -sf "$OMNI_ENGINE/skills" "$DEPLOY_DIR/knowledge/omni-skills"
+ln -sf "$OMNI_ENGINE/COMPLETE_SYSTEM_GUIDE.md" "$DEPLOY_DIR/knowledge/system-guide.md"
+ln -sf "$OMNI_ENGINE/COLLECTED_SKILLS_INDEX.md" "$DEPLOY_DIR/knowledge/skills-index.md"
+
+# SECONDARY: My merged skills (28 skills)
+ln -sf "$HOME/.agents/skills" "$DEPLOY_DIR/knowledge/my-skills"
+
+# TERTIARY: APEX_CORE protocol
+ln -sf "$HOME/.apex_vault/AGENTS/gemini/skills/APEX_CORE.md" "$DEPLOY_DIR/knowledge/apex-core.md"
+
+# QUATERNARY: Memory rules
+ln -sf "$HOME/MEMORY.md" "$DEPLOY_DIR/MEMORY.md"
+ln -sf "$HOME/AGENTS.md" "$DEPLOY_DIR/AGENTS.md"
+
+# QUINARY: Holographic memory
+ln -sf "$HOME/MISSIONS/CONSOLIDATED/INFRASTRUCTURE/colossus-gateway/MEMORY-INTERFACE.py" "$DEPLOY_DIR/memory_interface.py"
+
+# SENARY: Stealth Claw
+ln -sf "$HOME/MISSIONS/CONSOLIDATED/AI_AGENTS/PRO_AGENTS/Stealth-Claw/stealth_claw/claw_core.py" "$DEPLOY_DIR/claw_core.py"
+
+echo -e "${GREEN}✅ Agent: $AGENT_NAME${NC}"
+echo -e "   Knowledge sources:"
+echo -e "     1. Omni Engine: $(ls -1 "$OMNI_ENGINE/skills/" | wc -l) skills"
+echo -e "     2. My Skills: 28 merged skills"
+echo -e "     3. APEX_CORE: 10 foundational protocols"
+echo -e "     4. Memory Rules: no placeholders, surgical edits"
+echo -e "     5. Holographic Memory: 6-layer mesh"
+echo -e "     6. Stealth Claw: 5-pillar execution"
+echo -e "   Total: 205+ skills symlinked"
+echo -e "   Model: $MODEL (local Ollama)"
+echo ""
+
+# Create deployment config
+cat > "$DEPLOY_DIR/config.json" << EOF
+{
+  "agent": "$AGENT_NAME",
+  "type": "ultra-agent",
+  "model": "$MODEL",
+  "knowledge": {
+    "omni_engine": "$OMNI_ENGINE/skills",
+    "my_skills": "$HOME/.agents/skills",
+    "apex_core": "$HOME/.apex_vault/AGENTS/gemini/skills/APEX_CORE.md",
+    "total_skills": 233
+  },
+  "capabilities": [
+    "scan_placeholders",
+    "generate_tests",
+    "reasoning",
+    "forensic_analysis",
+    "legal_automation",
+    "memory_operations"
+  ],
+  "deployed_at": "$(date -Iseconds)",
+  "off_premises": true
+}
+EOF
+
+echo -e "${CYAN}Config: $DEPLOY_DIR/config.json${NC}"
+echo ""
+echo -e "${CYAN}To run:${NC}"
+echo -e "  cd $DEPLOY_DIR"
+echo -e "  ollama run $MODEL 'Scan ~/MISSIONS for placeholders and fix them'"
