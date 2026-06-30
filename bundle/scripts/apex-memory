@@ -1,0 +1,79 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# apex-memory — CLI for holographic memory access
+# Usage:
+#   apex-memory read "query"        — query memory
+#   apex-memory write "content"     — write to memory
+#   apex-memory prime ["task"]      — get primed context for AI startup
+#   apex-memory status              — check memory system status
+#   apex-memory consolidate         — force mesh consolidation
+#   apex-memory serve               — start memory bridge server
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BRIDGE_DIR="$HOME/.apex_automation/memory-bridge"
+BRIDGE_URL="${APEX_MEMORY_URL:-http://localhost:8787}"
+
+case "${1:-help}" in
+    read)
+        QUERY="${2:?Usage: apex-memory read <query>}"
+        curl -s -X POST "$BRIDGE_URL/memory/read" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"$QUERY\"}" | python3 -m json.tool 2>/dev/null || echo '{"error": "Memory bridge not running. Start with: apex-memory serve"}'
+        ;;
+
+    write)
+        CONTENT="${2:?Usage: apex-memory write <content>}"
+        TAGS="${3:-}"
+        if [ -n "$TAGS" ]; then
+            curl -s -X POST "$BRIDGE_URL/memory/write" \
+                -H "Content-Type: application/json" \
+                -d "{\"content\": \"$CONTENT\", \"tags\": [$TAGS]}" | python3 -m json.tool
+        else
+            curl -s -X POST "$BRIDGE_URL/memory/write" \
+                -H "Content-Type: application/json" \
+                -d "{\"content\": \"$CONTENT\"}" | python3 -m json.tool
+        fi
+        ;;
+
+    prime)
+        TASK="${2:-}"
+        if [ -n "$TASK" ]; then
+            curl -s "$BRIDGE_URL/context/prime?task=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$TASK'))")" | python3 -m json.tool
+        else
+            curl -s "$BRIDGE_URL/context/prime" | python3 -m json.tool
+        fi
+        ;;
+
+    status)
+        curl -s "$BRIDGE_URL/memory/status" | python3 -m json.tool 2>/dev/null || echo '{"error": "Memory bridge not running"}'
+        ;;
+
+    consolidate)
+        curl -s -X POST "$BRIDGE_URL/memory/consolidate" | python3 -m json.tool
+        ;;
+
+    serve)
+        echo "Starting APEX Memory Bridge..."
+        python3 "$BRIDGE_DIR/memory_bridge.py" &
+        sleep 2
+        curl -s "$BRIDGE_URL/health" | python3 -m json.tool 2>/dev/null && echo "Memory Bridge is running on $BRIDGE_URL" || echo "Failed to start"
+        ;;
+
+    stop)
+        pkill -f "memory_bridge.py" 2>/dev/null && echo "Memory Bridge stopped" || echo "Not running"
+        ;;
+
+    help|*)
+        echo "apex-memory — Holographic Memory CLI"
+        echo ""
+        echo "Usage:"
+        echo "  apex-memory read <query>        Query memory"
+        echo "  apex-memory write <content>     Write to memory"
+        echo "  apex-memory prime [task]        Get primed context"
+        echo "  apex-memory status              Check status"
+        echo "  apex-memory consolidate         Force consolidation"
+        echo "  apex-memory serve               Start memory bridge"
+        echo "  apex-memory stop                Stop memory bridge"
+        ;;
+esac

@@ -1,0 +1,59 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Daemon — Persistent background process for Termux
+# Runs all automation without cron
+set -euo pipefail
+
+APEX_DIR="$HOME/.apex_automation"
+LOG_DIR="$APEX_DIR/logs"
+PID_FILE="$APEX_DIR/pids/daemon.pid"
+mkdir -p "$LOG_DIR" "$APEX_DIR/pids"
+
+if [ -f "$PID_FILE" ]; then
+    pid=$(cat "$PID_FILE")
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "[APEX] Daemon already running (PID: $pid)"
+        exit 0
+    fi
+fi
+
+echo $$ > "$PID_FILE"
+echo "[APEX] Daemon started (PID: $$)"
+
+# Cleanup on exit
+cleanup() {
+    echo "[APEX] Daemon stopping..."
+    rm -f "$PID_FILE"
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
+
+# Main loop
+while true; do
+    hour=$(date +%H)
+    min=$(date +%M)
+    
+    # Every 6 hours: scan
+    if [ $((hour % 6)) -eq 0 ] && [ "$min" = "00" ]; then
+        echo "[APEX] Running scan..."
+        python3 "$APEX_DIR/gdrive_final/gdrive_intel.py" scan >> "$LOG_DIR/scan.log" 2>&1
+    fi
+    
+    # Every hour: FILEBOSS
+    if [ "$min" = "00" ]; then
+        echo "[APEX] Running FILEBOSS..."
+        python3 "$APEX_DIR/gdrive_final/fileboss.py" --source gdrive >> "$LOG_DIR/fileboss.log" 2>&1
+    fi
+    
+    # Every 30 minutes: watch
+    if [ $((min % 30)) -eq 0 ]; then
+        python3 "$APEX_DIR/gdrive_final/gdrive_watcher.py" once >> "$LOG_DIR/watcher.log" 2>&1
+    fi
+    
+    # Daily at 2am: organize
+    if [ "$hour" = "02" ] && [ "$min" = "00" ]; then
+        echo "[APEX] Running organize..."
+        python3 "$APEX_DIR/gdrive_final/gdrive_organize.py" all >> "$LOG_DIR/organize.log" 2>&1
+    fi
+    
+    sleep 60
+done

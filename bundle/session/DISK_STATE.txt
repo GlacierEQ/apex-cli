@@ -1,0 +1,2 @@
+/dev/block/dm-12 1012M 1009M     0 100% /
+/dev/block/dm-60  230G  209G   21G  92% /data

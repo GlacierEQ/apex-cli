@@ -1,0 +1,80 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Verify and promote Linux device identity (never Android exclusion)
+set -euo pipefail
+
+HOME="${HOME:-/data/data/com.termux/files/home}"
+ID_JSON="$HOME/.apex/LINUX_DEVICE_IDENTITY.json"
+BOOT_CLIENT="$HOME/.local/share/mimocode/mimo-free-client"
+
+[[ -f "$HOME/.apex/linux_identity.env" ]] && source "$HOME/.apex/linux_identity.env"
+
+python3 - <<'PY'
+import hashlib, json, os, platform, subprocess, sys
+from pathlib import Path
+
+home = Path(os.environ.get("HOME", "."))
+id_path = home / ".apex/LINUX_DEVICE_IDENTITY.json"
+client_path = home / ".local/share/mimocode/mimo-free-client"
+
+def kernel():
+    try:
+        return subprocess.check_output(["uname", "-s"], text=True).strip()
+    except Exception:
+        return "unknown"
+
+def mimo_fingerprint_seed():
+    if id_path.exists():
+        meta = json.loads(id_path.read_text())
+        c = meta.get("canonical", {})
+        fp = meta.get("fingerprint", {})
+        if fp.get("seed_template"):
+            return fp["seed_template"]
+        return "|".join([
+            c.get("host_alias", "apex-termux"),
+            c.get("platform", "linux"),
+            c.get("arch", "arm64"),
+            c.get("cpu_model", "unknown-cpu"),
+            c.get("operator_user", "operator"),
+        ])
+    return "apex-termux|linux|arm64|unknown-cpu|operator"
+
+def mimo_fingerprint():
+    try:
+        v = client_path.read_text().strip()
+        if v:
+            return v
+    except OSError:
+        pass
+    seed = mimo_fingerprint_seed()
+    return hashlib.sha256(seed.encode()).hexdigest()
+
+kernel_ok = kernel() == "Linux"
+id_ok = id_path.exists()
+seed = mimo_fingerprint_seed()
+fp = mimo_fingerprint()
+leaks = {
+    "python_platform_system": platform.system(),
+    "node_platform": None,
+}
+
+report = {
+    "host_alias": os.environ.get("APEX_HOST_ALIAS", "apex-termux"),
+    "kernel": kernel(),
+    "platform_canonical": "linux",
+    "arch": "arm64",
+    "fingerprint_seed": seed,
+    "fingerprint": fp,
+    "persisted_client": client_path.exists(),
+    "checks": {
+        "kernel_linux": kernel_ok,
+        "identity_manifest": id_ok,
+        "fingerprint_uses_linux": "linux" in seed and "android" not in seed.lower(),
+    },
+    "runtime_leaks": leaks,
+    "policy": "linux_first — Android runtime tags are not device identity",
+}
+
+ok = all(report["checks"].values())
+print(json.dumps(report, indent=2))
+sys.exit(0 if ok else 1)
+PY

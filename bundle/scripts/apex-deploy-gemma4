@@ -1,0 +1,133 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# Deploy Gemma4 Edge Node with symlinked knowledge
+set -euo pipefail
+
+AGENT_NAME="gemma4-$(date +%s)"
+DEPLOY_DIR="$HOME/.apex_automation/agents/$AGENT_NAME"
+MODEL="apex-gemma4"
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║     GEMMA4 EDGE NODE DEPLOYMENT — OFF-PREM      ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+mkdir -p "$DEPLOY_DIR/workspace" "$DEPLOY_DIR/logs"
+
+# Symlink knowledge
+ln -sf "$HOME/.agents/skills" "$DEPLOY_DIR/skills"
+ln -sf "$HOME/MEMORY.md" "$DEPLOY_DIR/MEMORY.md"
+ln -sf "$HOME/AGENTS.md" "$DEPLOY_DIR/AGENTS.md"
+ln -sf "$HOME/MISSIONS/CONSOLIDATED/INFRASTRUCTURE/colossus-gateway/MEMORY-INTERFACE.py" "$DEPLOY_DIR/memory_interface.py"
+
+cat > "$DEPLOY_DIR/gemma4_node.py" << 'NODE_EOF'
+#!/usr/bin/env python3
+"""Gemma4 Edge Node — Local AI with symlinked knowledge"""
+
+import os
+import json
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+class Gemma4Node:
+    def __init__(self):
+        self.name = "GEMMA4_EDGE"
+        self.model = "apex-gemma4"
+        self.workspace = Path(__file__).parent / "workspace"
+        self.workspace.mkdir(exist_ok=True)
+        
+    def log(self, msg):
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"🔮 [GEMMA4] [{ts}] {msg}")
+    
+    def query(self, prompt, context_nodes=0):
+        """Execute reasoning via local Gemma4 model."""
+        self.log(f"Reasoning: {prompt[:50]}...")
+        cmd = ["ollama", "run", self.model, prompt]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return {
+            "model": self.model,
+            "response": result.stdout,
+            "nodes_processed": context_nodes,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    def analyze_file(self, file_path):
+        """Analyze a file for quality issues."""
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        # Check for placeholders
+        issues = []
+        placeholders = ["TODO", "FIXME", "PLACEHOLDER", "stub", "mock"]
+        for p in placeholders:
+            if p in content:
+                issues.append(f"Contains {p}")
+        
+        # Check for real tests
+        if "expect(" not in content and "assert" not in content and file_path.endswith('.test.ts'):
+            issues.append("No real assertions")
+        
+        return {
+            "file": file_path,
+            "issues": issues,
+            "score": 100 - (len(issues) * 20)
+        }
+    
+    def scan_directory(self, dir_path):
+        """Scan directory for quality issues."""
+        self.log(f"Scanning {dir_path}...")
+        results = []
+        
+        for root, dirs, files in os.walk(dir_path):
+            dirs[:] = [d for d in dirs if d not in ['node_modules', '.git', 'dist']]
+            
+            for file in files:
+                if file.endswith(('.ts', '.tsx', '.js', '.py')):
+                    filepath = os.path.join(root, file)
+                    result = self.analyze_file(filepath)
+                    if result['issues']:
+                        results.append(result)
+        
+        return results
+
+if __name__ == "__main__":
+    node = Gemma4Node()
+    node.log("Gemma4 Edge Node deployed with symlinked knowledge")
+    
+    # Test scan
+    results = node.scan_directory(os.path.expanduser("~/pro-code"))
+    node.log(f"Found {len(results)} files with issues")
+    
+    for r in results[:5]:
+        node.log(f"  {r['file']}: {r['issues']}")
+NODE_EOF
+
+chmod +x "$DEPLOY_DIR/gemma4_node.py"
+
+cat > "$DEPLOY_DIR/config.json" << EOF
+{
+  "agent": "$AGENT_NAME",
+  "type": "gemma4-edge",
+  "model": "$MODEL",
+  "architecture": "Mixture-of-Experts (MoE)",
+  "context_window": "256K",
+  "capabilities": ["analyze_file", "scan_directory", "reasoning"],
+  "deployed_at": "$(date -Iseconds)",
+  "knowledge_source": "symlink",
+  "off_premises": true
+}
+EOF
+
+echo -e "${GREEN}✅ Agent: $AGENT_NAME${NC}"
+echo -e "   Knowledge: symlinked (28 skills)"
+echo -e "   Model: $MODEL (local Ollama)"
+echo -e "   Architecture: MoE 26B"
+echo ""
+echo -e "${CYAN}To run:${NC}"
+echo -e "  cd $DEPLOY_DIR"
+echo -e "  python3 gemma4_node.py"

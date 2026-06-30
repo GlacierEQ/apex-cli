@@ -1,0 +1,81 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Vault Export — Generate vault.enc for team distribution
+# Run this ONCE to create the encrypted vault file that ships with the repo.
+# Usage: apex-vault-export
+
+set -euo pipefail
+
+VAULT_ENC="${1:-$HOME/.apex_vault/vault.enc}"
+VAULT_DIR="$HOME/.apex_vault/keys"
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║          APEX VAULT EXPORT                      ║${NC}"
+echo -e "${CYAN}║                                                  ║${NC}"
+echo -e "${CYAN}║  Creates encrypted vault.enc for team sharing    ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Check if keys exist
+if [ ! -d "$VAULT_DIR" ] || [ -z "$(ls -A "$VAULT_DIR"/*.enc 2>/dev/null)" ]; then
+    echo -e "${RED}❌ No keys found at $VAULT_DIR${NC}"
+    echo -e "   Run: python3 operator_key_vault.py --init"
+    exit 1
+fi
+
+echo -e "${CYAN}Found key sets:${NC}"
+ls -1 "$VAULT_DIR"/*.enc | while read f; do
+    echo -e "  🔑 $(basename "$f" .enc)"
+done
+
+echo ""
+echo -e "${CYAN}Enter passphrase to encrypt vault (this is what team will use):${NC}"
+read -sp "Passphrase: " PASSPHRASE
+echo ""
+read -sp "Confirm passphrase: " PASSPHRASE2
+echo ""
+
+if [ "$PASSPHRASE" != "$PASSPHRASE2" ]; then
+    echo -e "${RED}❌ Passphrases don't match.${NC}"
+    exit 1
+fi
+
+# Export vault
+python3 -c "
+import json, os, glob
+from cryptography.fernet import Fernet
+import base64
+
+passphrase = '''$PASSPHRASE'''
+key = base64.urlsafe_b64encode(passphrase[:32].encode().ljust(32, b'0'))
+cipher = Fernet(key)
+
+vault = {}
+for enc_file in glob.glob('$VAULT_DIR/*.enc'):
+    name = os.path.basename(enc_file).replace('.enc', '')
+    with open(enc_file, 'rb') as f:
+        encrypted = f.read()
+    decrypted = cipher.decrypt(encrypted)
+    vault[name] = json.loads(decrypted)
+
+# Create master vault
+master_encrypted = cipher.encrypt(json.dumps(vault).encode())
+os.makedirs(os.path.dirname('$VAULT_ENC') or '.', exist_ok=True)
+with open('$VAULT_ENC', 'wb') as f:
+    f.write(master_encrypted)
+
+print(f'✅ Vault exported: $VAULT_ENC')
+print(f'✅ {len(vault)} key sets encrypted')
+print(f'')
+print(f'Distribute this file with the repo.')
+print(f'Team runs: apex-setup → enters passphrase → done.')
+"
+
+echo ""
+echo -e "${GREEN}✅ Vault exported to: ${VAULT_ENC}${NC}"
+echo -e "${GREEN}   Ship this file with your repo.${NC}"
+echo -e "${GREEN}   Team runs 'apex-setup' with the passphrase.${NC}"

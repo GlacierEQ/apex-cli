@@ -1,0 +1,69 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# apex-memory-daemon — persistent memory bridge daemon
+# Starts the memory bridge as a background daemon that survives shell exit
+
+set -euo pipefail
+
+BRIDGE_DIR="$HOME/.apex_automation/memory-bridge"
+PID_FILE="$HOME/.apex_automation/memory-bridge.pid"
+LOG_FILE="$HOME/.local/share/memory-bridge.log"
+
+start() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "Memory bridge already running (PID $PID)"
+            return 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    cd "$BRIDGE_DIR"
+    nohup python3 memory_bridge.py > "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    sleep 2
+
+    if curl -s http://localhost:8787/health >/dev/null 2>&1; then
+        echo "Memory bridge started (PID $(cat $PID_FILE))"
+    else
+        echo "Failed to start memory bridge"
+        rm -f "$PID_FILE"
+        return 1
+    fi
+}
+
+stop() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if kill -0 "$PID" 2>/dev/null; then
+            kill "$PID"
+            echo "Memory bridge stopped"
+        fi
+        rm -f "$PID_FILE"
+    else
+        echo "Memory bridge not running"
+    fi
+}
+
+status() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "Memory bridge running (PID $PID)"
+            curl -s http://localhost:8787/health 2>/dev/null || echo "Health check failed"
+        else
+            echo "Memory bridge PID file exists but process dead"
+            rm -f "$PID_FILE"
+        fi
+    else
+        echo "Memory bridge not running"
+    fi
+}
+
+case "${1:-start}" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; sleep 1; start ;;
+    status) status ;;
+    *) echo "Usage: $0 {start|stop|restart|status}" ;;
+esac

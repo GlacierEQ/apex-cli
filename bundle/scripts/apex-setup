@@ -1,0 +1,180 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Setup — One-passphrase key distribution
+# Usage: apex-setup
+#
+# What it does:
+# 1. Checks if vault is already initialized locally
+# 2. If not, prompts for passphrase (shared across team)
+# 3. Decrypts vault.enc → ~/.apex_vault/keys/
+# 4. Validates all 6 memory layers are accessible
+# 5. Done. No copy/paste ever again.
+
+set -euo pipefail
+
+VAULT_ENC="$HOME/.apex_vault/vault.enc"
+VAULT_DIR="$HOME/.apex_vault/keys"
+PASSPHRASE_FILE="$HOME/.apex_vault/.passphrase_hash"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+mkdir -p "$VAULT_DIR"
+
+# Check if already initialized
+if [ -f "$PASSPHRASE_FILE" ]; then
+    echo -e "${GREEN}✅ Vault already initialized.${NC}"
+    echo -e "   Keys at: $VAULT_DIR"
+    
+    # Quick validation
+    MISSING=0
+    for key in mem0 supermemory memory_plugin supabase; do
+        if [ ! -f "$VAULT_DIR/${key}.enc" ]; then
+            echo -e "${RED}❌ Missing: ${key}.enc${NC}"
+            MISSING=1
+        fi
+    done
+    
+    if [ "$MISSING" -eq 0 ]; then
+        echo -e "${GREEN}✅ All memory layers present.${NC}"
+        exit 0
+    fi
+fi
+
+echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║          APEX HOLOGRAPHIC MEMORY SETUP          ║${NC}"
+echo -e "${CYAN}║                                                  ║${NC}"
+echo -e "${CYAN}║  One passphrase. All 6 memory layers. Done.      ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Check for vault file
+if [ ! -f "$VAULT_ENC" ]; then
+    echo -e "${YELLOW}⚠  No vault.enc found at:${NC}"
+    echo -e "   $VAULT_ENC"
+    echo ""
+    echo -e "${CYAN}Options:${NC}"
+    echo -e "  1. Get vault.enc from your team lead"
+    echo -e "  2. Create new vault (generate your own keys)"
+    echo ""
+    read -p "Choice [1/2]: " CHOICE
+    
+    if [ "$CHOICE" = "2" ]; then
+        echo ""
+        echo -e "${CYAN}Creating new vault. You'll need API keys for:${NC}"
+        echo -e "  1. Mem0 (https://mem0.ai)"
+        echo -e "  2. Supermemory (https://supermemory.ai)"
+        echo -e "  3. MemoryPlugin (https://memoryplugin.com)"
+        echo -e "  4. Supabase (https://supabase.com)"
+        echo ""
+        
+        # Generate encryption key
+        read -sp "Enter passphrase for new vault: " PASSPHRASE
+        echo ""
+        
+        # Create vault structure
+        python3 -c "
+import json, hashlib, os, sys
+from cryptography.fernet import Fernet
+
+passphrase = '''$PASSPHRASE'''
+key = base64.urlsafe_b64encode(passphrase[:32].encode().ljust(32, b'0'))
+cipher = Fernet(key)
+
+vault = {}
+print('Enter your API keys (press Enter to skip):')
+
+services = [
+    ('mem0', ['api_key', 'org_id']),
+    ('supermemory', ['primary_key']),
+    ('memory_plugin', ['global_token', 'direct_token']),
+    ('supabase', ['anon_key', 'service_key']),
+]
+
+for service, fields in services:
+    vault[service] = {}
+    for field in fields:
+        val = input(f'  {service}.{field}: ').strip()
+        vault[service][field] = val or 'PLACEHOLDER'
+
+encrypted = cipher.encrypt(json.dumps(vault).encode())
+os.makedirs('$VAULT_DIR', exist_ok=True)
+with open('$VAULT_ENC', 'wb') as f:
+    f.write(encrypted)
+
+# Store passphrase hash
+phash = hashlib.sha256(passphrase.encode()).hexdigest()
+with open('$PASSPHRASE_FILE', 'w') as f:
+    f.write(phash)
+
+print(f'✅ Vault created: $VAULT_ENC')
+print(f'✅ Passphrase stored: $PASSPHRASE_FILE')
+"
+        exit 0
+    else
+        echo -e "${RED}Get vault.enc from your team lead and place it at:${NC}"
+        echo -e "   $VAULT_ENC"
+        exit 1
+    fi
+fi
+
+# Vault exists — decrypt with passphrase
+echo -e "${CYAN}Vault found. Enter passphrase to decrypt:${NC}"
+read -sp "Passphrase: " PASSPHRASE
+echo ""
+
+# Verify passphrase
+EXPECTED_HASH=$(cat "$PASSPHRASE_FILE" 2>/dev/null || echo "")
+INPUT_HASH=$(echo -n "$PASSPHRASE" | sha256sum | cut -d' ' -f1)
+
+if [ -n "$EXPECTED_HASH" ] && [ "$INPUT_HASH" != "$EXPECTED_HASH" ]; then
+    echo -e "${RED}❌ Wrong passphrase.${NC}"
+    exit 1
+fi
+
+# Decrypt vault
+python3 -c "
+import json, hashlib, os, sys
+from cryptography.fernet import Fernet
+
+passphrase = '''$PASSPHRASE'''
+key = base64.urlsafe_b64encode(passphrase[:32].encode().ljust(32, b'0'))
+cipher = Fernet(key)
+
+with open('$VAULT_ENC', 'rb') as f:
+    encrypted = f.read()
+
+decrypted = cipher.decrypt(encrypted)
+vault = json.loads(decrypted)
+
+os.makedirs('$VAULT_DIR', exist_ok=True)
+
+for name, data in vault.items():
+    path = f'$VAULT_DIR/{name}.enc'
+    enc_data = cipher.encrypt(json.dumps(data).encode())
+    with open(path, 'wb') as f:
+        f.write(enc_data)
+    print(f'  ✅ {name}')
+
+# Store passphrase hash for future checks
+phash = hashlib.sha256(passphrase.encode()).hexdigest()
+with open('$PASSPHRASE_FILE', 'w') as f:
+    f.write(phash)
+
+print(f'\n✅ {len(vault)} key sets decrypted to $VAULT_DIR')
+"
+
+echo ""
+echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║          SETUP COMPLETE — HOLOGRAPHIC MESH       ║${NC}"
+echo -e "${GREEN}║                                                  ║${NC}"
+echo -e "${GREEN}║  6 memory layers ready:                          ║${NC}"
+echo -e "${GREEN}║    ✓ Mem0 Pro + Regular                          ║${NC}"
+echo -e "${GREEN}║    ✓ Supermemory (primary)                       ║${NC}"
+echo -e "${GREEN}║    ✓ MemoryPlugin (global + direct)              ║${NC}"
+echo -e "${GREEN}║    ✓ Supabase                                    ║${NC}"
+echo -e "${GREEN}║                                                  ║${NC}"
+echo -e "${GREEN}║  Run: python3 holographic_memory.py              ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"

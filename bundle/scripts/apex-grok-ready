@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# APEX Grok readiness bootstrap — skills, memory, connectors, helix verify
+set -euo pipefail
+
+HOME_DIR="${HOME:-/data/data/com.termux/files/home}"
+[[ -f "$HOME_DIR/.gemini_keys" ]] && source "$HOME_DIR/.gemini_keys"
+export PATH="$HOME_DIR/bin:$HOME_DIR/.grok/bin:$PATH"
+
+PASS=0
+FAIL=0
+WARN=0
+
+ok()   { echo "  OK   $*"; PASS=$((PASS+1)); }
+warn() { echo "  WARN $*"; WARN=$((WARN+1)); }
+bad()  { echo "  FAIL $*"; FAIL=$((FAIL+1)); }
+
+echo "APEX Grok Readiness Check"
+echo "========================"
+
+# Helix links
+for link in Pro_Code pro-code pro_code; do
+  target="$HOME_DIR/$link"
+  if [[ -L "$target" ]] && [[ -d "$(readlink -f "$target")" ]]; then
+    ok "Helix $link -> $(readlink "$target")"
+  elif [[ -d "$target" ]]; then
+    warn "Helix $link is directory not symlink"
+  else
+    bad "Helix $link missing"
+  fi
+done
+
+# Orbit bidirectional
+if [[ -L "$HOME_DIR/Pro_Code/ORBIT_ALPHA_METHODOLOGY" ]] && [[ -L "$HOME_DIR/pro-code/ORBIT_OMEGA_SKILL" ]]; then
+  ok "Alpha<->Omega orbit symlinks"
+else
+  bad "Orbit symlinks broken"
+fi
+
+# sm-ops / supermemory CLI
+if command -v sm-ops >/dev/null && command -v supermemory >/dev/null; then
+  ok "sm-ops + supermemory CLI"
+else
+  bad "sm-ops or supermemory missing"
+fi
+
+# Memory prime
+if sm-ops prime "apex grok readiness bootstrap" > "$HOME_DIR/.supermemory/ops/live-context.md" 2>/dev/null; then
+  ok "Memory prime ($(wc -c < "$HOME_DIR/.supermemory/ops/live-context.md" | tr -d ' ') bytes)"
+else
+  bad "Memory prime failed"
+fi
+
+# Grok config
+if [[ -f "$HOME_DIR/.grok/config.toml" ]]; then
+  ok "Grok config.toml"
+  grep -q '\[memory\]' "$HOME_DIR/.grok/config.toml" && ok "Grok memory enabled" || warn "Grok memory section missing"
+  grep -q 'SessionStart' "$HOME_DIR/.grok/hooks/memory-prime.json" 2>/dev/null && ok "Memory prime hooks" || warn "Hooks not configured"
+else
+  bad "Grok config missing"
+fi
+
+# AGENTS.md
+[[ -f "$HOME_DIR/AGENTS.md" ]] && ok "AGENTS.md project rules" || bad "AGENTS.md missing"
+
+# Skills paths
+for skill in helix-pro-code supermemory-cli; do
+  if [[ -f "$HOME_DIR/.grok/skills/$skill/SKILL.md" ]] || [[ -f "$HOME_DIR/.agents/skills/$skill/SKILL.md" ]]; then
+    ok "Skill: $skill"
+  else
+    warn "Skill: $skill not in .grok/skills"
+  fi
+done
+
+# Unified memory MCP script
+[[ -f "$HOME_DIR/scripts/unified_memory_mcp.py" ]] && ok "Unified Memory MCP script" || warn "unified_memory_mcp.py missing"
+
+# API keys (presence only)
+for key in SUPERMEMORY_API_KEY MEM0_API_KEY GITHUB_TOKEN; do
+  if [[ -n "${!key:-}" ]]; then ok "Key set: $key"; else warn "Key missing: $key"; fi
+done
+
+# Mem0 live check
+if [[ -n "${MEM0_API_KEY:-}" ]] && curl -sf -H "Authorization: Token $MEM0_API_KEY" "https://api.mem0.ai/v1/memories/?page_size=1" >/dev/null 2>&1; then
+  ok "Mem0 API reachable"
+else
+  warn "Mem0 API check failed"
+fi
+
+# Supermemory live check
+if supermemory whoami --json >/dev/null 2>&1; then
+  ok "Supermemory authenticated"
+else
+  warn "Supermemory auth failed"
+fi
+
+# Actor folder organization
+ACTOR_STATE="$HOME_DIR/.supermemory/ops/actor-organize-state.json"
+BY_ACTOR="$HOME_DIR/MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/EVIDENCE/BY_ACTOR"
+if [[ -f "$BY_ACTOR/MANIFEST.md" ]] && [[ -f "$ACTOR_STATE" ]]; then
+  ok "BY_ACTOR manifest + organize state"
+elif [[ -d "$BY_ACTOR" ]]; then
+  warn "BY_ACTOR exists but not organized — run: sm-ops actors --skip-supermemory"
+else
+  bad "BY_ACTOR folder missing"
+fi
+
+echo ""
+echo "Result: $PASS passed, $WARN warnings, $FAIL failed"
+echo "Live context: $HOME_DIR/.supermemory/ops/live-context.md"
+echo "Start Grok: grok  (hooks auto-prime on SessionStart)"
+
+[[ $FAIL -eq 0 ]]

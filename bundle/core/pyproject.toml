@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "computer-user"
+version = "2.0.0"
+description = "Platform-agnostic desktop automation agent"
+requires-python = ">=3.9"
+license = {text = "Proprietary"}
+authors = [{name = "Casey Barton", email = "casey.barton92@gmail.com"}]
+
+dependencies = []
+
+[project.optional-dependencies]
+puppeteer = ["nodeenv>=1.7"]
+dev = ["pytest>=7.0", "ruff>=0.1"]
+
+[project.scripts]
+computer-user = "computer_user.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["computer_user*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

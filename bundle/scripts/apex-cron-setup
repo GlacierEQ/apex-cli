@@ -1,0 +1,42 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# APEX Cron Setup — Automated scheduled tasks
+set -euo pipefail
+
+APEX_DIR="$HOME/.apex_automation"
+CRON_FILE="$HOME/.apex_cron"
+
+echo "[APEX] Setting up automated cron jobs..."
+
+# Create cron entries
+cat > "$CRON_FILE" << 'EOF'
+# APEX Automated Tasks — Do not edit manually
+# Use: apex-cron edit
+
+# Every 6 hours: Scan Google Drive
+0 */6 * * * cd ~/.apex_automation/gdrive_final && python3 gdrive_intel.py scan >> ~/logs/gdrive_scan.log 2>&1
+
+# Every hour: Run FILEBOSS on new files
+0 * * * * cd ~/.apex_automation/gdrive_final && python3 fileboss.py --source gdrive >> ~/logs/fileboss_hourly.log 2>&1
+
+# Every 12 hours: Run all pipelines
+0 0,12 * * * cd ~/.apex_automation/gdrive && python3 pipeline_orchestrator.py all >> ~/logs/pipelines.log 2>&1
+
+# Daily at 2am: Full backup
+0 2 * * * cd ~/.apex_automation/gdrive_final && python3 gdrive_organize.py all >> ~/logs/organize.log 2>&1
+
+# Every 30 minutes: Watch for changes
+*/30 * * * * cd ~/.apex_automation/gdrive_final && python3 gdrive_watcher.py once >> ~/logs/watcher.log 2>&1
+EOF
+
+# Install cron
+crontab "$CRON_FILE"
+
+echo "[APEX] ✅ Cron jobs installed:"
+echo "  - GDrive scan: every 6 hours"
+echo "  - FILEBOSS: every hour"
+echo "  - Pipelines: every 12 hours"
+echo "  - Organize: daily at 2am"
+echo "  - Watcher: every 30 minutes"
+echo ""
+echo "[APEX] View with: crontab -l"
+echo "[APEX] Remove with: crontab -r"

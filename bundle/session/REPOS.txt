@@ -1,0 +1,11 @@
+.nvm: 
+.asdf: 
+.: main
+apex-cli: master
+mastermind: main
+nexus-api: main
+apex-alpha: main
+apex-omega: main
+computer-user: main
+apex-workers-runtime: main
+CYBERTACK: master

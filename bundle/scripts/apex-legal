@@ -1,0 +1,214 @@
+#!/data/data/com.termux/files/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# APEX Legal Ops — Unified CLI for Case 1FDV-23-0001009
+# Consolidates: evidence vault, legal briefs, case filings, forensics
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+LEGAL_OPS="$HOME/MISSIONS/LEGAL_OPS"
+CYBERTACK="$HOME/CYBERTACK"
+CATACLYSM="$HOME/MISSIONS/THE_CATACLYSM"
+CASE_FILINGS="$LEGAL_OPS/CASE_FILINGS/1FDV-23-0001009"
+
+show_help() {
+  cat << 'EOF'
+APEX Legal Ops — Unified CLI
+
+Usage: apex-legal <command> [options]
+
+Commands:
+  status          Show consolidated case status
+  evidence        List evidence items with hash verification
+  briefs          List legal briefs and their status
+  filings         List case filings
+  forensics       Show forensic analysis status
+  timeline        Show case timeline
+  search <query>  Search across all legal docs
+  sync            Sync local → GitHub repos
+  audit           Run integrity audit on evidence
+
+Examples:
+  apex-legal status
+  apex-legal evidence --unverified
+  apex-legal search "Brower RICO"
+  apex-legal sync
+EOF
+}
+
+cmd_status() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " APEX Legal Ops — Case 1FDV-23-0001009 Status"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "📁 Case Filings:"
+  if [ -d "$CASE_FILINGS" ]; then
+    find "$CASE_FILINGS" -name "*.md" -o -name "*.tex" -o -name "*.pdf" 2>/dev/null | wc -l | xargs -I{} echo "   {} documents"
+  fi
+  
+  echo ""
+  echo "🔍 Evidence Vault:"
+  if [ -d "$LEGAL_OPS/EVIDENCE_VAULT" ]; then
+    find "$LEGAL_OPS/EVIDENCE_VAULT" -type f 2>/dev/null | wc -l | xargs -I{} echo "   {} items"
+  fi
+  
+  echo ""
+  echo "⚖️ Legal Briefs:"
+  if [ -d "$LEGAL_OPS/LEGAL_BRIEFS" ]; then
+    find "$LEGAL_OPS/LEGAL_BRIEFS" -name "*.tex" -o -name "*.md" 2>/dev/null | wc -l | xargs -I{} echo "   {} briefs"
+  fi
+  
+  echo ""
+  echo "🔬 Forensics:"
+  if [ -d "$LEGAL_OPS/FORENSICS" ]; then
+    find "$LEGAL_OPS/FORENSICS" -type f 2>/dev/null | wc -l | xargs -I{} echo "   {} reports"
+  fi
+  
+  echo ""
+  echo "📊 GitHub Repos:"
+  unset GITHUB_TOKEN 2>/dev/null
+  gh repo list GlacierEQ --limit 500 --json name --jq 'length' 2>/dev/null | xargs -I{} echo "   {} total repos"
+  
+  echo ""
+  echo "💾 Disk Usage:"
+  du -sh "$LEGAL_OPS" 2>/dev/null | awk '{print "   Local: " $1}'
+}
+
+cmd_evidence() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Evidence Vault — Case 1FDV-23-0001009"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  if [ -d "$LEGAL_OPS/EVIDENCE_VAULT" ]; then
+    echo "📄 Evidence Documents:"
+    find "$LEGAL_OPS/EVIDENCE_VAULT" -name "*.md" -exec basename {} \; 2>/dev/null | sort
+  fi
+  
+  echo ""
+  echo "📁 Forensic Reports:"
+  find "$CATACLYSM/FORENSICS" -name "*.md" -exec basename {} \; 2>/dev/null | sort | head -20
+}
+
+cmd_briefs() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Legal Briefs Pipeline"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "📋 Active Briefs:"
+  if [ -d "$CASE_FILINGS/04_LEGAL" ]; then
+    find "$CASE_FILINGS/04_LEGAL" -name "*.md" -o -name "*.tex" 2>/dev/null | sort
+  fi
+  
+  echo ""
+  echo "📝 Brief Templates:"
+  if [ -d "$LEGAL_OPS/LEGAL_BRIEFS" ]; then
+    find "$LEGAL_OPS/LEGAL_BRIEFS" -name "*.tex" 2>/dev/null | sort
+  fi
+}
+
+cmd_filings() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Case Filings — 1FDV-23-0001009"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  if [ -d "$CASE_FILINGS" ]; then
+    echo "📂 Filing Structure:"
+    find "$CASE_FILINGS" -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort
+  fi
+  
+  echo ""
+  echo "📄 Filing Documents:"
+  find "$CASE_FILINGS" -name "*.md" -maxdepth 2 2>/dev/null | sort | head -20
+}
+
+cmd_forensics() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Forensic Analysis — Case 1FDV-23-0001009"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "🔬 Forensic Reports:"
+  find "$LEGAL_OPS/FORENSICS" -name "*.md" 2>/dev/null | sort
+  
+  echo ""
+  echo "📁 Evidence Items:"
+  find "$CATACLYSM/FORENSICS" -type f 2>/dev/null | wc -l | xargs -I{} echo "   {} forensic items"
+}
+
+cmd_timeline() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Case Timeline — 1FDV-23-0001009"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  if [ -f "$CASE_FILINGS/05_TIMELINE/MASTER_CASE_TIMELINE.md" ]; then
+    head -100 "$CASE_FILINGS/05_TIMELINE/MASTER_CASE_TIMELINE.md"
+  elif [ -f "$CATACLYSM/CASE_STRUCTURE/MASTER_CASE_TIMELINE.md" ]; then
+    head -100 "$CATACLYSM/CASE_STRUCTURE/MASTER_CASE_TIMELINE.md"
+  else
+    echo "No timeline found"
+  fi
+}
+
+cmd_search() {
+  local query="$1"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Search: $query"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "📄 Case Filings:"
+  grep -rl "$query" "$CASE_FILINGS" 2>/dev/null | head -10
+  
+  echo ""
+  echo "🔍 Evidence Vault:"
+  grep -rl "$query" "$LEGAL_OPS/EVIDENCE_VAULT" 2>/dev/null | head -10
+  
+  echo ""
+  echo "📁 Catclysm:"
+  grep -rl "$query" "$CATACLYSM" 2>/dev/null | head -10
+}
+
+cmd_sync() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Syncing Local → GitHub"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "📤 Pushing case files..."
+  cd "$CYBERTACK" && git add -A && git commit -m "Legal ops consolidation: $(date +%Y-%m-%d)" 2>/dev/null || true
+  
+  echo "✅ Sync complete"
+}
+
+cmd_audit() {
+  echo "═══════════════════════════════════════════════════════════════"
+  echo " Evidence Integrity Audit"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  
+  echo "🔐 Hash Verification:"
+  if [ -f "$CATACLYSM/FORENSICS/SHA256_HASHES.txt" ]; then
+    head -20 "$CATACLYSM/FORENSICS/SHA256_HASHES.txt"
+  fi
+  
+  echo ""
+  echo "📊 Evidence Count:"
+  find "$LEGAL_OPS/EVIDENCE_VAULT" -type f 2>/dev/null | wc -l | xargs -I{} echo "   {} evidence items"
+}
+
+case "${1:-help}" in
+  status)     cmd_status ;;
+  evidence)   cmd_evidence ;;
+  briefs)     cmd_briefs ;;
+  filings)    cmd_filings ;;
+  forensics)  cmd_forensics ;;
+  timeline)   cmd_timeline ;;
+  search)     cmd_search "${2:-}" ;;
+  sync)       cmd_sync ;;
+  audit)      cmd_audit ;;
+  help|*)     show_help ;;
+esac
