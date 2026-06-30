@@ -30,6 +30,21 @@ Pro Code CLI suite for the APEX ecosystem.
 | `apex-auto-start` | Auto-start services |
 | `apex-service` | Service management |
 
+## Space Management
+
+| Command | Purpose |
+|---------|---------|
+| `apex-space-monitor` | Disk space monitoring + cleanup |
+| `apex-space-manager` | Comprehensive space report + cleanup |
+| `apex-space-daemon` | Hourly space monitoring daemon |
+
+## Browser & Infrastructure
+
+| Command | Purpose |
+|---------|---------|
+| `apex-browser-adapter` | Universal browser backend (Tasklet/Puppeteer) |
+| `apex-paths` | Configurable path resolution |
+
 ## Deployment Scripts
 
 | Command | Purpose |
@@ -50,6 +65,18 @@ chmod +x *
 cp * ~/bin/
 ```
 
-## Pro Code Philosophy
+## Usage
 
-Take what's known. Make it better. Don't touch the core.
+```bash
+# Space management
+apex-space-monitor          # Quick check
+apex-space-manager          # Full report
+apex-space-daemon           # Hourly daemon
+
+# Memory
+apex-memory prime "task"    # Prime context
+apex-memory save "outcome"  # Save learning
+
+# Forensics
+apex-forensics scan         # Scan evidence
+```
