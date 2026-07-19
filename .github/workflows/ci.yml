@@ -1,23 +1,14 @@
-name: APEX CI Pipeline
+name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
-  test:
-    runs-on: [self-hosted, public]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements.txt 2>/dev/null || true
-      - name: Run tests
-        run: python -m pytest tests/ -v 2>/dev/null || echo "No tests found"
-      - name: Verify core modules
-        run: python -c "from core.browser_adapter import get_backend; print('✅ Core modules OK')"
+  ci:
+    uses: GlacierEQ/public-actions-runner-host/.github/workflows/reusable-quick-ci.yml@main
+    with:
+      repo_name: ${{ github.event.repository.name }}
+      language: python
