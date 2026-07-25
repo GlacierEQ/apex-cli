@@ -30,21 +30,25 @@ echo "  ✅ Core modules installed"
 
 # Install config
 echo "Installing config..."
-cp "$BUNDLE_DIR"/config/AGENTS.md "$HOME/" 2>/dev/null
+if [ -f "$BUNDLE_DIR/config/AGENTS.md" ]; then
+    cp "$BUNDLE_DIR/config/AGENTS.md" "$HOME/" 2>/dev/null || true
+elif [ -f "$BUNDLE_DIR/AGENTS.md" ]; then
+    cp "$BUNDLE_DIR/AGENTS.md" "$HOME/" 2>/dev/null || true
+fi
 echo "  ✅ AGENTS.md installed"
 
 # Install scripts
 echo "Installing scripts..."
 mkdir -p "$HOME/scripts"
-cp "$BUNDLE_DIR"/scripts/*.py "$HOME/scripts/" 2>/dev/null
-cp "$BUNDLE_DIR"/scripts/*.sh "$HOME/scripts/" 2>/dev/null
-chmod +x "$HOME/scripts/"*.sh 2>/dev/null
+[ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.py "$HOME/scripts/" 2>/dev/null || true
+[ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.sh "$HOME/scripts/" 2>/dev/null || true
+[ -d "$HOME/scripts" ] && chmod +x "$HOME/scripts/"*.sh 2>/dev/null || true
 echo "  ✅ Scripts installed"
 
 # Install tests
 echo "Installing tests..."
 mkdir -p "$HOME/tests"
-cp "$BUNDLE_DIR"/tests/*.py "$HOME/tests/" 2>/dev/null
+[ -d "$BUNDLE_DIR/tests" ] && cp "$BUNDLE_DIR"/tests/*.py "$HOME/tests/" 2>/dev/null || true
 echo "  ✅ Tests installed"
 
 # Verify
@@ -61,7 +65,7 @@ CORE_COUNT=$(ls "$CONFIG_DIR/core/"*.py 2>/dev/null | wc -l)
 echo "Core modules: $CORE_COUNT"
 
 # Check scripts
-SCRIPT_COUNT=$(ls "$HOME/scripts/"*.py "$HOME/scripts/"*.sh 2>/dev/null | wc -l)
+SCRIPT_COUNT=$(find "$HOME/scripts" -type f 2>/dev/null | wc -l | tr -d ' ')
 echo "Scripts: $SCRIPT_COUNT"
 
 # Test browser adapter
