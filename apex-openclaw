@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# apex-openclaw — APEX OpenClaw Computer-User Action Engine Runner
+set -euo pipefail
+
+OPENCLAW_PATH="/Users/kcbflux/job-app/repos/openclaw"
+
+if [ ! -d "$OPENCLAW_PATH" ]; then
+    echo "Error: OpenClaw repository not found at $OPENCLAW_PATH" >&2
+    exit 1
+fi
+
+export PYTHONPATH="$OPENCLAW_PATH/src:${PYTHONPATH:-}"
+
+python3 - <<'PY' "$@"
+import sys
+import json
+from openclaw import OpenClawEngine
+
+claw = OpenClawEngine()
+args = sys.argv[1:]
+
+action_type = args[0] if len(args) > 0 else "inspect_dom"
+target = args[1] if len(args) > 1 else "active_window"
+
+res = claw.execute_action(action_type, target)
+print(json.dumps(res, indent=2))
+PY
