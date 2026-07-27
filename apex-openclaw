@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# apex-openclaw — APEX OpenClaw Computer-User Action Engine Runner
+# apex-openclaw — APEX OpenClaw v2.5 PRO Computer-User Action Engine Runner
 set -euo pipefail
 
 OPENCLAW_PATH="/Users/kcbflux/job-app/repos/openclaw"
@@ -19,9 +19,13 @@ from openclaw import OpenClawEngine
 claw = OpenClawEngine()
 args = sys.argv[1:]
 
-action_type = args[0] if len(args) > 0 else "inspect_dom"
-target = args[1] if len(args) > 1 else "active_window"
-
-res = claw.execute_action(action_type, target)
-print(json.dumps(res, indent=2))
+if len(args) > 0 and args[0] in ("--config", "config"):
+    print(json.dumps(claw.config, indent=2))
+elif len(args) > 0 and args[0] in ("--vision", "vision"):
+    print(json.dumps(claw.sample_vision_state(), indent=2))
+else:
+    action_type = args[0] if len(args) > 0 else "inspect_dom"
+    target = args[1] if len(args) > 1 else "active_window"
+    res = claw.execute_action(action_type, target)
+    print(json.dumps(res, indent=2))
 PY
