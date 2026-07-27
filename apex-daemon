@@ -33,7 +33,7 @@ while true; do
     min=$(date +%M)
     
     # Every 6 hours: scan
-    if [ $((hour % 6)) -eq 0 ] && [ "$min" = "00" ]; then
+    if [ $((10#$hour % 6)) -eq 0 ] && [ "$min" = "00" ]; then
         echo "[APEX] Running scan..."
         python3 "$APEX_DIR/gdrive_final/gdrive_intel.py" scan >> "$LOG_DIR/scan.log" 2>&1
     fi
@@ -45,7 +45,7 @@ while true; do
     fi
     
     # Every 30 minutes: watch
-    if [ $((min % 30)) -eq 0 ]; then
+    if [ $((10#$min % 30)) -eq 0 ]; then
         python3 "$APEX_DIR/gdrive_final/gdrive_watcher.py" once >> "$LOG_DIR/watcher.log" 2>&1
     fi
     
