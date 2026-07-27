@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # apex-memory — CLI for holographic memory access
 # Usage:
 #   apex-memory read "query"        — query memory

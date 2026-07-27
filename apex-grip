@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # apex-grip — tight grip on GlacierEQ private sovereign stack
 # status · sync · index · list
 set -euo pipefail

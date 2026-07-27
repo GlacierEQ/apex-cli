@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # APEX Auto-Start — Runs on boot, no manual intervention needed
 set -euo pipefail
 

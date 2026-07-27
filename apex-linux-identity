@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # Verify and promote Linux device identity (never Android exclusion)
 set -euo pipefail
 

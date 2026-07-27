@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # Deploy Gemma4 Edge Node with symlinked knowledge
 set -euo pipefail
 

@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # APEX Daemon — Persistent background process for Termux
 # Runs all automation without cron
 set -euo pipefail

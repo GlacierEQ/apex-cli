@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # APEX Placeholder Scanner — Scans repos for placeholders and fixes them
 # Usage: apex-scan-placeholders [directory] [--fix]
 

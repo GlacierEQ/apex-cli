@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # APEX Lossless Consolidation
 # Preserves ALL data — only moves and symlinks, never deletes

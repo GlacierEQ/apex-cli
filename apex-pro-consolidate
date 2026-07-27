@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # APEX Pro-* → Aspen Grove Consolidation
 # Archives overlapping Pro-* repos, keeps unique ones

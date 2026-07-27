@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # apex-memory-daemon — persistent memory bridge daemon
 # Starts the memory bridge as a background daemon that survives shell exit
 

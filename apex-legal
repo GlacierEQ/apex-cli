@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # APEX Legal Ops — Unified CLI for Case 1FDV-23-0001009
 # Consolidates: evidence vault, legal briefs, case filings, forensics

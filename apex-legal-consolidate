@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # APEX Legal Ops — GitHub Repo Consolidation
 # Archives Z-BACKUP repos, merges duplicates

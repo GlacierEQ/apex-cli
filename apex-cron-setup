@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # APEX Cron Setup — Automated scheduled tasks
 set -euo pipefail
 

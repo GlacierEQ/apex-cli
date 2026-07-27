@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # APEX Phase 2 Consolidation
 # Remaining: AEON_VAULT, SUPPORTING_DATA, TOOLS, small dirs

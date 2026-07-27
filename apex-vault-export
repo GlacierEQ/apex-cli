@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env bash
+#!/usr/bin/env bash
 # APEX Vault Export — Generate vault.enc for team distribution
 # Run this ONCE to create the encrypted vault file that ships with the repo.
 # Usage: apex-vault-export
