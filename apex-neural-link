@@ -2,17 +2,25 @@
 # apex-neural-link — Janus V2 Microwave ↔ Synthesizer steward channel
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+# Resolve through symlinks (e.g. ~/bin/apex-neural-link → repo)
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 export CASE_ID="${CASE_ID:-1FDV-23-0001009}"
 export APEX_PROFILE="${APEX_PROFILE:-coremaximized}"
+export APEX_CLI_ROOT="$ROOT"
 
 SCRIPT="$ROOT/scripts/establish_neural_link.py"
 if [[ ! -f "$SCRIPT" ]]; then
   SCRIPT="$ROOT/bundle/scripts/establish_neural_link.py"
 fi
 
-# Prefer Aspen/operator venv (fastapi/uvicorn), else python3
 if [[ -x "$HOME/GlacierEQ/aspen-grove-operator-v7/.venv/bin/python" ]]; then
   PY="$HOME/GlacierEQ/aspen-grove-operator-v7/.venv/bin/python"
 elif [[ -x "$ROOT/.venv/bin/python" ]]; then
