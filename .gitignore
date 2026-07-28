@@ -4,3 +4,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.operator_key_vault/
+**/gatekeeper.env
+**/*credentials*.env
+**/MASTER.env
+**/*key*vault*.py.bak
+.apex_vault/
