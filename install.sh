@@ -41,9 +41,26 @@ echo "  ✅ AGENTS.md installed"
 echo "Installing scripts..."
 mkdir -p "$HOME/scripts"
 [ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.py "$HOME/scripts/" 2>/dev/null || true
+[ -d "$BUNDLE_DIR/bundle/scripts" ] && cp "$BUNDLE_DIR"/bundle/scripts/*.py "$HOME/scripts/" 2>/dev/null || true
 [ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.sh "$HOME/scripts/" 2>/dev/null || true
 [ -d "$HOME/scripts" ] && chmod +x "$HOME/scripts/"*.sh 2>/dev/null || true
 echo "  ✅ Scripts installed"
+
+# Install Janus neural link (synthesizer + client)
+echo "Installing neural link (Janus V2)..."
+mkdir -p "$HOME/servers" "$HOME/bin"
+if [[ -d "$BUNDLE_DIR/servers/synthesizer" ]]; then
+  ln -sfn "$BUNDLE_DIR/servers/synthesizer" "$HOME/servers/synthesizer"
+  touch "$HOME/servers/__init__.py"
+fi
+if [[ -f "$BUNDLE_DIR/scripts/establish_neural_link.py" ]]; then
+  ln -sfn "$BUNDLE_DIR/scripts/establish_neural_link.py" "$HOME/scripts/establish_neural_link.py"
+fi
+if [[ -f "$BUNDLE_DIR/apex-neural-link" ]]; then
+  cp "$BUNDLE_DIR/apex-neural-link" "$BIN_DIR/apex-neural-link"
+  chmod +x "$BIN_DIR/apex-neural-link"
+fi
+echo "  ✅ Neural link installed (port 8000 synthesizer)"
 
 # Install tests
 echo "Installing tests..."

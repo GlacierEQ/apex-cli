@@ -71,6 +71,19 @@ apex-cli/
 | `apex-deploy-masterpiece` | Deploy masterpiece |
 | `apex-deploy-omni` | Deploy omni agent |
 
+### Neural Link (Janus V2)
+| Command | Purpose |
+|---------|---------|
+| `apex-neural-link --maximize` | Start locus + forge Microwave links (steward mode) |
+| `apex-neural-link --brief` | Compact steward brief |
+| `apex-neural-link --context` | Token-cheap context card |
+| `apex-neural-link --status` | Health + active links |
+| `apex-neural-link --reply AGENT TEXT` | Steward → agent outbox |
+
+**Locus:** `servers/synthesizer` on port **8000** (Microwave ↔ Synthesizer-Grok)  
+**State:** `~/.apex/neural_link/` (durable)  
+**Client:** `scripts/establish_neural_link.py`
+
 ## Core Modules
 
 | Module | Purpose |
@@ -89,6 +102,24 @@ git clone https://github.com/GlacierEQ/apex-cli.git
 cd apex-cli
 chmod +x apex-*
 cp apex-* ~/bin/
+# optional: link neural-link client + synthesizer package for $HOME runtime
+mkdir -p ~/scripts ~/servers ~/bin
+ln -sfn "$PWD/scripts/establish_neural_link.py" ~/scripts/establish_neural_link.py
+ln -sfn "$PWD/servers/synthesizer" ~/servers/synthesizer
+ln -sfn "$PWD/apex-neural-link" ~/bin/apex-neural-link
+```
+
+### Janus neural link (steward)
+
+Requires FastAPI + uvicorn (Aspen Grove venv works):
+
+```bash
+# maximize Microwave ↔ Synthesizer for steward
+./apex-neural-link --maximize
+
+# or manually
+export PYTHONPATH=$PWD
+uvicorn servers.synthesizer.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Recovery
