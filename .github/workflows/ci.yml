@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main]
+    branches: [main, master]
+  schedule:
+    # Run daily at 2:00 AM HST (12:00 PM UTC) to monitor pipeline baseline latencies
+    - cron: '0 12 * * *'
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -15,3 +19,28 @@ jobs:
       run_tests: true
       run_lint: true
       run_security: true
+
+  benchmark:
+    name: APEX Performance Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-python: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp psycopg2-binary
+
+      - name: Execute APEX Multiplexer Benchmark
+        env:
+          APEX_NEO4J_DIRECT_CONN: ${{ secrets.APEX_NEO4J_DIRECT_CONN }}
+          APEX_BRIDGE_URL: ${{ secrets.APEX_BRIDGE_URL }}
+        run: |
+          python core/benchmark_pipeline.py
