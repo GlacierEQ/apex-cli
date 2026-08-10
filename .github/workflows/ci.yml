@@ -2,17 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [master]
   schedule:
-    # Run daily at 2:00 AM HST (12:00 PM UTC) to monitor pipeline baseline latencies
     - cron: '0 12 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
-    uses: GlacierEQ/public-actions-runner-host/.github/workflows/reusable-ci.yml@main
+    uses: GlacierEQ/public-actions-runner-host/.github/workflows/reusable-ci.yml@de58bce31d7099af7e89c8d8a3b6472356b0cec3
     with:
       repo_name: ${{ github.event.repository.name }}
       language: python
@@ -21,11 +23,16 @@ jobs:
       run_security: true
 
   benchmark:
-    name: APEX Performance Benchmark
+    name: Optional external integration benchmark
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout exact source
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,14 +40,13 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Dependencies
+      - name: Install benchmark dependencies
         run: |
           python -m pip install --upgrade pip
           pip install aiohttp psycopg2-binary
 
-      - name: Execute APEX Multiplexer Benchmark
+      - name: Execute optional APEX multiplexer benchmark
         env:
           APEX_NEO4J_DIRECT_CONN: ${{ secrets.APEX_NEO4J_DIRECT_CONN }}
           APEX_BRIDGE_URL: ${{ secrets.APEX_BRIDGE_URL }}
-        run: |
-          python core/benchmark_pipeline.py
+        run: python core/benchmark_pipeline.py
