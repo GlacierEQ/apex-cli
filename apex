@@ -1,43 +1,78 @@
 #!/usr/bin/env bash
-# apex — Unified APEX Ecosystem CLI Runner
+# apex — bounded APEX CLI dispatcher
 set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+JOB_APP_DIR="${APEX_JOB_APP_DIR:-$HOME/job-app}"
+
+exec_local_or_bin() {
+    local command_name="$1"
+    shift
+    if [[ -x "$SCRIPT_DIR/$command_name" ]]; then
+        exec "$SCRIPT_DIR/$command_name" "$@"
+    fi
+    if [[ -x "$HOME/bin/$command_name" ]]; then
+        exec "$HOME/bin/$command_name" "$@"
+    fi
+    echo "APEX dependency unavailable: $command_name" >&2
+    exit 78
+}
+
+require_job_app_file() {
+    local relative_path="$1"
+    local path="$JOB_APP_DIR/$relative_path"
+    if [[ ! -f "$path" ]]; then
+        echo "APEX external job-app dependency unavailable: $path" >&2
+        echo "Set APEX_JOB_APP_DIR to an explicit verified checkout if needed." >&2
+        exit 78
+    fi
+    printf '%s\n' "$path"
+}
 
 SUBCOMMAND="${1:-help}"
 shift || true
 
 case "$SUBCOMMAND" in
     openclaw|claw)
-        exec "$HOME/bin/apex-openclaw" "$@"
+        exec_local_or_bin apex-openclaw "$@"
         ;;
     daemon)
-        exec "$HOME/bin/apex-daemon" "$@"
+        exec_local_or_bin apex-daemon "$@"
         ;;
     highway)
-        exec python3 "$HOME/job-app/apex_highway.py" "$@"
+        highway="$(require_job_app_file apex_highway.py)"
+        exec python3 "$highway" "$@"
         ;;
     hero|heroes|demo)
-        exec bash "$HOME/job-app/demo_heroes.sh" "$@"
+        heroes="$(require_job_app_file demo_heroes.sh)"
+        exec bash "$heroes" "$@"
         ;;
     status|health)
+        highway="$(require_job_app_file apex_highway.py)"
+        governance="$(require_job_app_file apex_agent_governance_matrix.py)"
         echo "=== APEX SYSTEM STATUS ==="
         echo "APEX Highway Engine:"
-        python3 "$HOME/job-app/apex_highway.py"
+        python3 "$highway"
         echo ""
         echo "APEX Governance Matrix:"
-        python3 "$HOME/job-app/apex_agent_governance_matrix.py"
+        python3 "$governance"
         ;;
     help|--help|-h)
-        echo "=== APEX MASTER CLI ==="
-        echo "Usage: apex <command> [args]"
-        echo ""
-        echo "Commands:"
-        echo "  apex openclaw [action] [target]  Run OpenClaw computer-user action engine"
-        echo "  apex openclaw vision             Sample screen vision & OCR elements"
-        echo "  apex openclaw config             Display OpenClaw top-tier configuration"
-        echo "  apex daemon                      Run APEX background daemon"
-        echo "  apex highway                     Scan 61-node APEX Highway network mesh"
-        echo "  apex hero                        Run 20-Hero demonstration suite"
-        echo "  apex status                      Display system status and governance matrix"
+        cat <<'EOF'
+=== APEX CLI ===
+Usage: apex <command> [args]
+
+Repository-local commands:
+  apex openclaw [action] [target]  Run the apex-openclaw command if installed here or in ~/bin
+  apex daemon                      Run the apex-daemon command if installed here or in ~/bin
+
+Explicit external job-app commands:
+  apex highway                     Run apex_highway.py from APEX_JOB_APP_DIR
+  apex hero                        Run demo_heroes.sh from APEX_JOB_APP_DIR
+  apex status                      Run highway + governance scripts from APEX_JOB_APP_DIR
+
+External job-app commands fail closed with exit 78 when their files are absent.
+EOF
         ;;
     *)
         echo "Unknown command: $SUBCOMMAND" >&2
