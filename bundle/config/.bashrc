@@ -1,12 +1,14 @@
 # ╔══════════════════════════════════════════════════════════════════╗
-# ║  APEX SYSTEM BASHRC — MAXIMUM BOOTUP + PRO-CODE                ║
-# ║  Source'd directly (no subshells) for <100ms startup            ║
+# ║  APEX SYSTEM BASHRC — PORTABLE BOOT TEMPLATE                   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-# ── PATH (single export, no duplicates) ──────────────────────────
+# This public template intentionally contains no credentials. User-owned
+# credentials may be loaded from files outside the repository.
+
+# ── PATH ───────────────────────────────────────────────────────────
 export PATH="$HOME/bin:$HOME/.local/bin:$HOME/.mimocode/bin:$HOME/.bun/bin:$HOME/.grok/bin:$PATH"
 
-# ── APEX Core Environment ────────────────────────────────────────
+# ── APEX Core Environment ─────────────────────────────────────────
 export APEX_VERBOSE=0
 export APEX_ROOT_CHECKPOINT="30db1e4f"
 export APEX_POINTER_INDEX="$HOME/APEX_POINTER_INDEX.json"
@@ -15,15 +17,16 @@ export TOKEN_SAVINGS_ENABLED=true
 export HYPER_EFFICIENCY_FLOW=true
 export SURGICAL_MODE=true
 
-# ── Load Sovereign Environment Keys ───────────────────────────────
+# ── User-owned secret sources (not stored in this repository) ─────
 [[ -f "$HOME/.gemini_keys" ]] && source "$HOME/.gemini_keys"
+[[ -f "$HOME/.apex/secrets.env" ]] && source "$HOME/.apex/secrets.env"
 
-# ── Memory Prime (Supermemory + Mem0 token savings) ─────────────
+# ── Memory Prime ──────────────────────────────────────────────────
 alias prime-ctx='cat "$HOME/.supermemory/ops/live-context.md" 2>/dev/null || echo "Run: apex-prime \"your task\""'
 export APEX_LIVE_CONTEXT="$HOME/.supermemory/ops/live-context.md"
 alias apex-ready='apex-grok-ready'
 
-# ── Performance Tuning (from apex_terminal_maximize.sh) ───────────
+# ── Performance Tuning ────────────────────────────────────────────
 export OMP_NUM_THREADS=$(nproc)
 export OPENBLAS_NUM_THREADS=$(nproc)
 export MALLOC_ARENA_MAX=2
@@ -32,7 +35,7 @@ export MALLOC_TRIM_THRESHOLD_=65536
 export AEON_MAX_POWER=1
 export AEON_TOKEN_CACHE_HIT=88.2
 
-# ── Pro-Code Identity (from pro_code/CODER-SKILL.md) ─────────────
+# ── Pro-Code Identity ─────────────────────────────────────────────
 export PRO_CODE_VERSION="1.1"
 export PRO_CODE_MANTRA="Two strands. One sovereign DNA."
 export PRO_CODE_STYLE="production-grade, not prototype"
@@ -40,7 +43,7 @@ export PRO_CODE_PHILOSOPHY="One Big Push — never fragment what belongs togethe
 
 ulimit -n 16384 2>/dev/null || true
 
-# ── Git Optimization (from apex_system_maximizer.sh) ──────────────
+# ── Git Optimization ──────────────────────────────────────────────
 git config --global core.compression 9 2>/dev/null
 git config --global http.postBuffer 524288000 2>/dev/null
 git config --global core.packedGitLimit 512m 2>/dev/null
@@ -49,7 +52,7 @@ git config --global pack.deltaCacheSize 512m 2>/dev/null
 git config --global pack.packSizeLimit 512m 2>/dev/null
 git config --global pack.windowMemory 512m 2>/dev/null
 
-# ── Termux Optimization (from apex_terminal_maximize.sh) ──────────
+# ── Termux Optimization ───────────────────────────────────────────
 mkdir -p ~/.termux
 cat << 'PROPS' > ~/.termux/termux.properties
 allow-external-apps = true
@@ -63,7 +66,7 @@ back-key = escape
 PROPS
 termux-wake-lock 2>/dev/null || true
 
-# ── Agent CLI Configs (from apex_cli_maximize.sh, inline) ─────────
+# ── Agent CLI Configs ─────────────────────────────────────────────
 mkdir -p ~/.config/antigravity ~/.mastermind ~/.config/goose ~/.config/codex ~/.config/gemini ~/.openclaw
 
 cat << 'YAML' > ~/.config/antigravity/config.yaml
@@ -99,7 +102,7 @@ cat << 'JSON' > ~/.openclaw/openclaw.json
 {"gateway":{"port":19000,"host":"127.0.0.1","cache_enabled":true},"agent":{"model":"gemini-2.0-flash-exp","provider":"google","max_context_tokens":1000000,"threading_mode":"max-performance"},"ui":{"theme":"pro-dark","compact_mode":true}}
 JSON
 
-# ── Aliases ──────────────────────────────────────────────────────
+# ── Aliases ───────────────────────────────────────────────────────
 alias apex-max='bash ~/.apex_system_maximizer.sh'
 alias agy-max='bash ~/.apex_cli_maximize.sh'
 alias term-max='bash ~/.apex_terminal_maximize.sh'
@@ -110,31 +113,25 @@ alias ll='ls -la'
 alias mission-status='cat ~/MISSIONS/AEON_777/aeon-777-mission-state.json'
 alias todo='cat ~/APEX_COMMAND_CENTER/01_MASTER_TRUTH_INDEX.md'
 
-# ── Ollama Local Models ──────────────────────────────────────────
+# ── Ollama Local Models ───────────────────────────────────────────
 alias run-gemma4='ollama run gemma4:SUPREME_REASONING'
 alias run-microwave='ollama run stealth-microwave:latest'
 alias run-supernova='ollama run stealth-supernova:latest'
 alias run-claw='ollama run stealth-claw:latest'
 alias run-mastermind='ollama run mastermind:latest'
 
-# ── Agent Wrappers (token savings injection) ─────────────────────
+# ── Agent Wrappers ────────────────────────────────────────────────
 gemini() { export TOKEN_SAVINGS_ENABLED=true HYPER_EFFICIENCY_FLOW=true SURGICAL_MODE=true; command gemini "$@"; }
 agy() { export TOKEN_SAVINGS_ENABLED=true HYPER_EFFICIENCY_FLOW=true SURGICAL_MODE=true; command agy "$@"; }
 mimo() { export TOKEN_SAVINGS_ENABLED=true HYPER_EFFICIENCY_FLOW=true SURGICAL_MODE=true; command mimo-ops "$@"; }
 mimocode() { mimo "$@"; }
 
-# ── Grok Completions ─────────────────────────────────────────────
+# ── Grok Completions ──────────────────────────────────────────────
 [[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
-export NOTION_API_KEY="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"
 
-
-# >>> grok installer >>>
-[[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
-# <<< grok installer <<<
-# APEX saved startup state (CoreMaximized token savings)
+# APEX saved startup state
 [ -f "$HOME/.apex/session_boot.env" ] && source "$HOME/.apex/session_boot.env"
 export APEX_STARTUP_STATE="$HOME/.apex/STARTUP_STATE.json"
-export GITHUB_TOKEN="github_pat_11BOJ6ZOA0UzG7G12gTS4a_b5kmvZdRF2nrlYuMP7woB9zmHD8QEH0tLrWVUXTkTbW2RULXVURHORUFS7"
-export GITHUB_TOKEN="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"
-# Load Google Keep keys on startup
-source ~/bin/sync-keys.sh 2>/dev/null
+
+# Optional user-owned key synchronization helper.
+source ~/bin/sync-keys.sh 2>/dev/null || true

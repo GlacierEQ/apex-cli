@@ -1,109 +1,108 @@
 #!/usr/bin/env bash
-# install.sh — Complete runtime installer
+# install.sh — APEX CLI installer
 # Run: bash install.sh
 
 set -euo pipefail
+
+HOME_DIR="${HOME:-}"
+if [[ -z "$HOME_DIR" ]]; then
+    echo "HOME is required for installation" >&2
+    exit 78
+fi
 
 echo "=== APEX CLI INSTALLER ==="
 echo ""
 
 BUNDLE_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN_DIR="$HOME/bin"
-CONFIG_DIR="$HOME/.apex"
-MEMORY_DIR="$HOME/.local/share/mimocode/memory"
+BIN_DIR="$HOME_DIR/bin"
+CONFIG_DIR="$HOME_DIR/.apex"
+MEMORY_DIR="$HOME_DIR/.local/share/mimocode/memory"
 
 # Create directories
 echo "Creating directories..."
 mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$MEMORY_DIR"
 
-# Install CLI tools
+# Install CLI tools and the canonical dispatcher.
 echo "Installing CLI tools..."
-cp "$BUNDLE_DIR"/apex-* "$BIN_DIR/" 2>/dev/null
-chmod +x "$BIN_DIR"/apex-* 2>/dev/null
-echo "  ✅ CLI tools installed to ~/bin/"
+if [[ -f "$BUNDLE_DIR/apex" ]]; then
+    cp "$BUNDLE_DIR/apex" "$BIN_DIR/apex"
+    chmod +x "$BIN_DIR/apex"
+fi
+for tool in "$BUNDLE_DIR"/apex-*; do
+    [[ -f "$tool" ]] || continue
+    cp "$tool" "$BIN_DIR/"
+    chmod +x "$BIN_DIR/$(basename "$tool")"
+done
+if [[ ! -x "$BIN_DIR/apex" ]]; then
+    echo "APEX dispatcher installation failed" >&2
+    exit 1
+fi
+echo "  CLI tools installed to ~/bin/"
 
 # Install core modules
 echo "Installing core modules..."
 mkdir -p "$CONFIG_DIR/core"
-cp "$BUNDLE_DIR"/core/*.py "$CONFIG_DIR/core/" 2>/dev/null
-echo "  ✅ Core modules installed"
+for module in "$BUNDLE_DIR"/core/*.py; do
+    [[ -f "$module" ]] || continue
+    cp "$module" "$CONFIG_DIR/core/"
+done
+echo "  Core modules installed"
 
 # Install config
 echo "Installing config..."
-if [ -f "$BUNDLE_DIR/config/AGENTS.md" ]; then
-    cp "$BUNDLE_DIR/config/AGENTS.md" "$HOME/" 2>/dev/null || true
-elif [ -f "$BUNDLE_DIR/AGENTS.md" ]; then
-    cp "$BUNDLE_DIR/AGENTS.md" "$HOME/" 2>/dev/null || true
+if [[ -f "$BUNDLE_DIR/config/AGENTS.md" ]]; then
+    cp "$BUNDLE_DIR/config/AGENTS.md" "$HOME_DIR/"
+elif [[ -f "$BUNDLE_DIR/AGENTS.md" ]]; then
+    cp "$BUNDLE_DIR/AGENTS.md" "$HOME_DIR/"
 fi
-echo "  ✅ AGENTS.md installed"
+echo "  AGENTS.md checked"
 
 # Install scripts
 echo "Installing scripts..."
-mkdir -p "$HOME/scripts"
-[ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.py "$HOME/scripts/" 2>/dev/null || true
-[ -d "$BUNDLE_DIR/bundle/scripts" ] && cp "$BUNDLE_DIR"/bundle/scripts/*.py "$HOME/scripts/" 2>/dev/null || true
-[ -d "$BUNDLE_DIR/scripts" ] && cp "$BUNDLE_DIR"/scripts/*.sh "$HOME/scripts/" 2>/dev/null || true
-[ -d "$HOME/scripts" ] && chmod +x "$HOME/scripts/"*.sh 2>/dev/null || true
-echo "  ✅ Scripts installed"
+mkdir -p "$HOME_DIR/scripts"
+for script_dir in "$BUNDLE_DIR/scripts" "$BUNDLE_DIR/bundle/scripts"; do
+    [[ -d "$script_dir" ]] || continue
+    for script in "$script_dir"/*.py "$script_dir"/*.sh; do
+        [[ -f "$script" ]] || continue
+        cp "$script" "$HOME_DIR/scripts/"
+    done
+done
+chmod +x "$HOME_DIR/scripts/"*.sh 2>/dev/null || true
+echo "  Scripts installed"
 
-# Install Janus neural link (synthesizer + client)
-echo "Installing neural link (Janus V2)..."
-mkdir -p "$HOME/servers" "$HOME/bin"
+# Install Janus neural link (synthesizer + client) when present.
+echo "Installing neural link (optional)..."
+mkdir -p "$HOME_DIR/servers"
 if [[ -d "$BUNDLE_DIR/servers/synthesizer" ]]; then
-  ln -sfn "$BUNDLE_DIR/servers/synthesizer" "$HOME/servers/synthesizer"
-  touch "$HOME/servers/__init__.py"
+    ln -sfn "$BUNDLE_DIR/servers/synthesizer" "$HOME_DIR/servers/synthesizer"
+    touch "$HOME_DIR/servers/__init__.py"
 fi
 if [[ -f "$BUNDLE_DIR/scripts/establish_neural_link.py" ]]; then
-  ln -sfn "$BUNDLE_DIR/scripts/establish_neural_link.py" "$HOME/scripts/establish_neural_link.py"
+    ln -sfn "$BUNDLE_DIR/scripts/establish_neural_link.py" "$HOME_DIR/scripts/establish_neural_link.py"
 fi
 if [[ -f "$BUNDLE_DIR/apex-neural-link" ]]; then
-  cp "$BUNDLE_DIR/apex-neural-link" "$BIN_DIR/apex-neural-link"
-  chmod +x "$BIN_DIR/apex-neural-link"
+    cp "$BUNDLE_DIR/apex-neural-link" "$BIN_DIR/apex-neural-link"
+    chmod +x "$BIN_DIR/apex-neural-link"
 fi
-echo "  ✅ Neural link installed (port 8000 synthesizer)"
 
-# Install tests
+# Install tests as preserved local utilities.
 echo "Installing tests..."
-mkdir -p "$HOME/tests"
-[ -d "$BUNDLE_DIR/tests" ] && cp "$BUNDLE_DIR"/tests/*.py "$HOME/tests/" 2>/dev/null || true
-echo "  ✅ Tests installed"
+mkdir -p "$HOME_DIR/tests"
+for test_file in "$BUNDLE_DIR"/tests/*.py; do
+    [[ -f "$test_file" ]] || continue
+    cp "$test_file" "$HOME_DIR/tests/"
+done
 
-# Verify
+# Verify the public dispatcher rather than inferring optional integrations.
 echo ""
 echo "=== VERIFICATION ==="
-echo ""
-
-# Check CLI tools
-TOOL_COUNT=$(ls "$BIN_DIR"/apex-* 2>/dev/null | wc -l)
-echo "CLI tools: $TOOL_COUNT"
-
-# Check core modules
-CORE_COUNT=$(ls "$CONFIG_DIR/core/"*.py 2>/dev/null | wc -l)
-echo "Core modules: $CORE_COUNT"
-
-# Check scripts
-SCRIPT_COUNT=$(find "$HOME/scripts" -type f 2>/dev/null | wc -l | tr -d ' ')
-echo "Scripts: $SCRIPT_COUNT"
-
-# Test browser adapter
-echo ""
-echo "Testing browser adapter..."
-python3 -c "import sys; sys.path.insert(0, '$CONFIG_DIR/core'); from browser_adapter import get_backend; print('  ✅ Browser adapter loaded')" 2>/dev/null || echo "  ⚠️ Browser adapter needs dependencies"
-
-# Test space monitor
-echo ""
-echo "Testing space monitor..."
-bash "$BIN_DIR/apex-space-monitor" 2>/dev/null | head -5 || echo "  ⚠️ Space monitor needs bash"
+"$BIN_DIR/apex" help >/dev/null
+printf 'Dispatcher: %s\n' "$BIN_DIR/apex"
+TOOL_COUNT=$(find "$BIN_DIR" -maxdepth 1 -type f -name 'apex*' | wc -l | tr -d ' ')
+CORE_COUNT=$(find "$CONFIG_DIR/core" -maxdepth 1 -type f -name '*.py' | wc -l | tr -d ' ')
+SCRIPT_COUNT=$(find "$HOME_DIR/scripts" -maxdepth 1 -type f | wc -l | tr -d ' ')
+printf 'CLI tools: %s\nCore modules: %s\nScripts: %s\n' "$TOOL_COUNT" "$CORE_COUNT" "$SCRIPT_COUNT"
 
 echo ""
 echo "=== INSTALL COMPLETE ==="
-echo ""
-echo "Installed:"
-echo "  $TOOL_COUNT CLI tools → ~/bin/"
-echo "  $CORE_COUNT core modules → ~/.apex/core/"
-echo "  $SCRIPT_COUNT scripts → ~/scripts/"
-echo ""
-echo "Next steps:"
-echo "  1. Ensure ~/bin/ is in PATH: export PATH=\"\$HOME/bin:\$PATH\""
-echo "  2. Run: apex-space-monitor"
-echo "  3. Run: apex-daemon"
+echo "Ensure ~/bin is on PATH, then run: apex help"

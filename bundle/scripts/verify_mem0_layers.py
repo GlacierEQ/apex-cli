@@ -1,214 +1,168 @@
 #!/usr/bin/env python3
+"""Read-only diagnostics for optional memory-provider connections.
+
+No credential is embedded in this repository. Each remote provider check requires
+its credential/endpoint through the environment and performs only read-only
+requests. Missing configuration is reported as unavailable rather than replaced
+with a fallback secret.
 """
-Verification script for Mem0 multi‑layer integration.
-Runs Neo4j, Pinecone, and Mem0 checks in parallel with async/await.
-"""
+from __future__ import annotations
+
 import asyncio
 import os
-import json
-import sys
-import random
-import aiohttp
+import socket
 from pathlib import Path
+from urllib.parse import urlparse
+
+import aiohttp
 from dotenv import load_dotenv
 
-# Use async drivers
 try:
     from neo4j import AsyncGraphDatabase
 except ImportError:
     AsyncGraphDatabase = None
 
-load_dotenv(Path.home() / ".env", override=True)
+load_dotenv(Path.home() / ".env", override=False)
 
-# Helper to format output headers
-def print_header(msg):
-    print(f"\n=== {msg} ===")
 
-# 1. Verify Mem0 API layer
-async def verify_mem0():
-    try:
-        # Resolve keys
-        mem_key = os.getenv("MEM0_API_KEY") or os.getenv("MEM_API_KEY")
-        if not mem_key:
-            # Fallback to known valid pro key
-            mem_key = "m0-XsPsE19WZoEesvOFYbm9A6Du98pWS8wyfHUXJ60U"
-            
-        print_header("Mem0 Cloud Memory Verification")
-        url = "https://api.mem0.ai/v1/memories/?user_id=test_verification"
-        headers = {"Authorization": f"Token {mem_key}"}
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as r:
-                status = r.status
-                if status == 200:
-                    print(f"✅ Mem0 Cloud API is ACTIVE (status={status})")
-                    return True
-                else:
-                    body = await r.text()
-                    print(f"❌ Mem0 Cloud API returned status {status}: {body}")
-                    return False
-    except Exception as e:
-        print(f"❌ Mem0 Cloud API connection failed: {e}")
+def print_header(message: str) -> None:
+    print(f"\n=== {message} ===")
+
+
+def _configured(*names: str) -> str | None:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
+async def verify_mem0() -> bool:
+    print_header("Mem0 Cloud Memory Verification")
+    mem_key = _configured("MEM0_API_KEY", "MEM_API_KEY")
+    if not mem_key:
+        print("⚠️ Mem0 verification skipped: MEM0_API_KEY/MEM_API_KEY is not configured.")
         return False
 
-# 2. Verify Neo4j Graph Database layer
-async def verify_neo4j():
+    url = "https://api.mem0.ai/v1/memories/?user_id=test_verification"
+    headers = {"Authorization": f"Token {mem_key}"}
     try:
-        uri = os.getenv("NEO4J_URI") or "bolt://localhost:7687"
-        user = os.getenv("NEO4J_USER") or "neo4j"
-        password = os.getenv("NEO4J_PASSWORD") or "neo4j"
-        
-        print_header("Neo4j Graph Database Verification")
-        
-        if not AsyncGraphDatabase:
-            print("⚠️ 'neo4j' Python package not installed or cannot be imported.")
-            return False
-            
-        # Check if local/remote Neo4j port is even open before attempting driver connection
-        # to avoid long timeout blocks.
-        import socket
-        from urllib.parse import urlparse
-        
-        parsed = urlparse(uri)
-        host = parsed.hostname or "localhost"
-        port = parsed.port or 7687
-        
-        s = socket.socket()
-        s.settimeout(1.5)
-        conn_res = s.connect_ex((host, port))
-        s.close()
-        
-        if conn_res != 0:
-            print(f"⚠️ Neo4j Database is OFFLINE (Port {port} on {host} is closed). Skipping connection test.")
-            return False
-            
-        async with AsyncGraphDatabase.driver(uri, auth=(user, password)) as driver:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    print("✅ Mem0 read-only API check succeeded.")
+                    return True
+                print(f"❌ Mem0 read-only API check returned HTTP {response.status}.")
+                return False
+    except Exception as exc:
+        print(f"❌ Mem0 read-only API check failed: {exc}")
+        return False
+
+
+async def verify_neo4j() -> bool:
+    print_header("Neo4j Graph Database Verification")
+    uri = _configured("NEO4J_URI")
+    neo4j_user = _configured("NEO4J_USER")
+    neo4j_credential = _configured("NEO4J_PASSWORD")
+    if not uri or not neo4j_user or not neo4j_credential:
+        print("⚠️ Neo4j verification skipped: URI/user/credential is not fully configured.")
+        return False
+    if AsyncGraphDatabase is None:
+        print("⚠️ Neo4j verification skipped: neo4j Python package is unavailable.")
+        return False
+
+    parsed = urlparse(uri)
+    host = parsed.hostname
+    port = parsed.port or 7687
+    if not host:
+        print("❌ Neo4j URI has no hostname.")
+        return False
+
+    try:
+        with socket.socket() as sock:
+            sock.settimeout(1.5)
+            if sock.connect_ex((host, port)) != 0:
+                print(f"⚠️ Neo4j endpoint is unavailable at {host}:{port}.")
+                return False
+
+        async with AsyncGraphDatabase.driver(
+            uri, auth=(neo4j_user, neo4j_credential)
+        ) as driver:
             async with driver.session() as session:
-                result = await session.run("RETURN 'graph test' AS msg")
+                result = await session.run("RETURN 1 AS ok")
                 record = await result.single()
-                print("✅ Neo4j Database is ACTIVE. Result:", record["msg"])
-                return True
-    except Exception as e:
-        print(f"❌ Neo4j Graph Verification Failed: {e}")
+                passed = bool(record and record["ok"] == 1)
+                print("✅ Neo4j read-only query succeeded." if passed else "❌ Neo4j read-only query failed.")
+                return passed
+    except Exception as exc:
+        print(f"❌ Neo4j read-only verification failed: {exc}")
         return False
 
-# 3. Verify Pinecone Vector Database layer
-async def verify_pinecone():
-    try:
-        print_header("Pinecone Vector Database Verification")
-        
-        # Pinecone keys & host details
-        pc_api_key = os.getenv("PINECONE_PRIMARY_KEY") or os.getenv("PINECONE_API_KEY")
-        index_name = os.getenv("PINECONE_INDEX") or "apex-main"
-        
-        if not pc_api_key:
-            raise RuntimeError("Missing configuration for Pinecone API Key.")
-            
-        # Get Pinecone index host
-        host = os.getenv("PINECONE_HOST") or "apex-main-xwjbbs7.svc.aped-4627-b74a.pinecone.io"
-        
-        # Generate a synthetic 1536-dimensional vector to test index operations
-        print(f"Generating 1536-dimensional verification vector (dimension matches OpenAI ada-002)...")
-        embedding = [random.uniform(-1.0, 1.0) for _ in range(1536)]
-        
-        # 3.1 Upsert verification vector
-        print(f"Upserting verification vector to Pinecone Index '{index_name}'...")
-        upsert_url = f"https://{host}/vectors/upsert"
-        headers = {"Api-Key": pc_api_key, "Content-Type": "application/json"}
-        upsert_payload = {
-            "vectors": [
-                {
-                    "id": "verify_test_vector",
-                    "values": embedding,
-                    "metadata": {"text": "synthetic verification vector", "test": True}
-                }
-            ]
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.post(upsert_url, headers=headers, json=upsert_payload) as r:
-                if r.status != 200:
-                    raise RuntimeError(f"Upsert failed: HTTP {r.status} - {await r.text()}")
-                
-            # 3.2 Query verification vector
-            print("Querying vector from Pinecone Index...")
-            query_url = f"https://{host}/query"
-            query_payload = {
-                "vector": embedding,
-                "topK": 1,
-                "includeMetadata": True
-            }
-            async with session.post(query_url, headers=headers, json=query_payload) as r:
-                if r.status != 200:
-                    raise RuntimeError(f"Query failed: HTTP {r.status} - {await r.text()}")
-                query_data = await r.json()
-                matches = query_data.get("matches", [])
-                
-        if matches:
-            print("✅ Pinecone Vector Database is ACTIVE.")
-            print(f"Match: id={matches[0].get('id')}, score={matches[0].get('score')}")
-            return True
-        else:
-            print("❌ Pinecone query succeeded but returned 0 matches.")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Pinecone Vector Verification Failed: {e}")
+
+async def verify_pinecone() -> bool:
+    print_header("Pinecone Vector Database Verification")
+    api_key = _configured("PINECONE_PRIMARY_KEY", "PINECONE_API_KEY")
+    host = _configured("PINECONE_HOST")
+    if not api_key or not host:
+        print("⚠️ Pinecone verification skipped: API key/host is not configured.")
         return False
 
-async def verify_qdrant():
+    url = f"https://{host}/describe_index_stats"
+    headers = {"Api-Key": api_key, "Content-Type": "application/json"}
     try:
-        print_header("Qdrant Vector Database Verification")
-        
-        host = os.getenv("QDRANT_HOST") or "localhost"
-        port = int(os.getenv("QDRANT_PORT") or "6333")
-        collection = os.getenv("QDRANT_COLLECTION") or "apex_memory"
-        api_key = os.getenv("QDRANT_KEY")
-        
-        # Socket check first
-        import socket
-        s = socket.socket()
-        s.settimeout(1.5)
-        conn_res = s.connect_ex((host, port))
-        s.close()
-        
-        if conn_res != 0:
-            print(f"⚠️ Qdrant Database is OFFLINE (Port {port} on {host} is closed). Skipping API test.")
-            return False
-            
-        url = f"http://{host}:{port}/collections/{collection}"
-        headers = {}
-        if api_key:
-            headers["api-key"] = api_key
-            
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as r:
-                if r.status == 200:
-                    print(f"✅ Qdrant Vector Database is ACTIVE (Collection '{collection}' exists).")
+            async with session.post(url, headers=headers, json={}) as response:
+                if response.status == 200:
+                    print("✅ Pinecone read-only index-stats check succeeded.")
                     return True
-                else:
-                    body = await r.text()
-                    print(f"⚠️ Qdrant returned status {r.status} for collection '{collection}': {body}")
-                    return False
-    except Exception as e:
-        print(f"❌ Qdrant Vector Verification Failed: {e}")
+                print(f"❌ Pinecone read-only index-stats check returned HTTP {response.status}.")
+                return False
+    except Exception as exc:
+        print(f"❌ Pinecone read-only verification failed: {exc}")
         return False
 
-async def main():
+
+async def verify_qdrant() -> bool:
+    print_header("Qdrant Vector Database Verification")
+    host = os.getenv("QDRANT_HOST") or "localhost"
+    port = int(os.getenv("QDRANT_PORT") or "6333")
+    collection = os.getenv("QDRANT_COLLECTION") or "apex_memory"
+    api_key = _configured("QDRANT_KEY")
+
+    try:
+        with socket.socket() as sock:
+            sock.settimeout(1.5)
+            if sock.connect_ex((host, port)) != 0:
+                print(f"⚠️ Qdrant endpoint is unavailable at {host}:{port}.")
+                return False
+
+        headers = {"api-key": api_key} if api_key else {}
+        url = f"http://{host}:{port}/collections/{collection}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    print("✅ Qdrant read-only collection check succeeded.")
+                    return True
+                print(f"❌ Qdrant read-only collection check returned HTTP {response.status}.")
+                return False
+    except Exception as exc:
+        print(f"❌ Qdrant read-only verification failed: {exc}")
+        return False
+
+
+async def main() -> None:
     print("=" * 60)
-    print("      DIAGNOSTIC REPORT FOR MEMORY CONNECTION LAYERS")
+    print("READ-ONLY MEMORY CONNECTION DIAGNOSTICS")
     print("=" * 60)
-    
-    results = await asyncio.gather(verify_mem0(), verify_pinecone(), verify_neo4j(), verify_qdrant())
-    
+    results = await asyncio.gather(
+        verify_mem0(), verify_pinecone(), verify_neo4j(), verify_qdrant()
+    )
+    labels = ("Mem0", "Pinecone", "Neo4j", "Qdrant")
     print("\n" + "=" * 60)
-    print("                     SUMMARY")
+    for label, passed in zip(labels, results):
+        print(f"{label:10}: {'AVAILABLE' if passed else 'UNAVAILABLE / NOT CONFIGURED'}")
     print("=" * 60)
-    print(f"  Mem0 Cloud API Layer         : {'✅ ACTIVE' if results[0] else '❌ OFFLINE/ERROR'}")
-    print(f"  Pinecone Vector DB Layer     : {'✅ ACTIVE' if results[1] else '❌ OFFLINE/ERROR'}")
-    print(f"  Neo4j Graph DB Layer         : {'✅ ACTIVE' if results[2] else '⚠️ OFFLINE (Port 7687 closed)'}")
-    print(f"  Qdrant Vector DB Layer       : {'✅ ACTIVE' if results[3] else '⚠️ OFFLINE (Port 6333 closed)'}")
-    print("=" * 60)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
