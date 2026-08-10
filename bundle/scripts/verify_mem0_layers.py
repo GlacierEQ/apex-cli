@@ -63,8 +63,8 @@ async def verify_neo4j() -> bool:
     print_header("Neo4j Graph Database Verification")
     uri = _configured("NEO4J_URI")
     neo4j_user = _configured("NEO4J_USER")
-    neo4j_password = _configured("NEO4J_PASSWORD")
-    if not uri or not neo4j_user or not neo4j_password:
+    neo4j_credential = _configured("NEO4J_PASSWORD")
+    if not uri or not neo4j_user or not neo4j_credential:
         print("⚠️ Neo4j verification skipped: URI/user/credential is not fully configured.")
         return False
     if AsyncGraphDatabase is None:
@@ -86,7 +86,7 @@ async def verify_neo4j() -> bool:
                 return False
 
         async with AsyncGraphDatabase.driver(
-            uri, auth=(neo4j_user, neo4j_password)
+            uri, auth=(neo4j_user, neo4j_credential)
         ) as driver:
             async with driver.session() as session:
                 result = await session.run("RETURN 1 AS ok")
