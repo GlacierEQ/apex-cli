@@ -3,7 +3,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-JOB_APP_DIR="${APEX_JOB_APP_DIR:-$HOME/job-app}"
+HOME_DIR="${HOME:-}"
+JOB_APP_DIR="${APEX_JOB_APP_DIR:-${HOME_DIR:+$HOME_DIR/job-app}}"
 
 exec_local_or_bin() {
     local command_name="$1"
@@ -11,8 +12,8 @@ exec_local_or_bin() {
     if [[ -x "$SCRIPT_DIR/$command_name" ]]; then
         exec "$SCRIPT_DIR/$command_name" "$@"
     fi
-    if [[ -x "$HOME/bin/$command_name" ]]; then
-        exec "$HOME/bin/$command_name" "$@"
+    if [[ -n "$HOME_DIR" && -x "$HOME_DIR/bin/$command_name" ]]; then
+        exec "$HOME_DIR/bin/$command_name" "$@"
     fi
     echo "APEX dependency unavailable: $command_name" >&2
     exit 78
@@ -20,6 +21,10 @@ exec_local_or_bin() {
 
 require_job_app_file() {
     local relative_path="$1"
+    if [[ -z "$JOB_APP_DIR" ]]; then
+        echo "APEX external job-app dependency unavailable: APEX_JOB_APP_DIR is unset and HOME is unavailable" >&2
+        exit 78
+    fi
     local path="$JOB_APP_DIR/$relative_path"
     if [[ ! -f "$path" ]]; then
         echo "APEX external job-app dependency unavailable: $path" >&2
