@@ -1,147 +1,94 @@
-# APEX CLI — Complete Runtime
+# APEX CLI
 
-Pro Code CLI suite for the APEX ecosystem. Everything needed to run, recover, and operate.
+**Repository-local command collection and bounded execution helpers for the APEX/AKOS portfolio.**
 
-## Structure
+This repository contains shell and Python utilities for local dispatch, path/credential configuration, pipeline sequencing, monitoring, recovery, and optional adapters. The presence of a command or connector file **does not prove** that an external service, sibling repository, account, browser, provider, credential, case system, or deployment target is currently connected or operational.
 
-```
-apex-cli/
-├── core/                    # Core runtime modules
-│   ├── browser_adapter.py   # Universal browser backend
-│   ├── paths.py             # Configurable path resolution
-│   ├── connections.py       # Credential loader
-│   ├── pipeline.py          # Pipeline runner (enforced execution)
-│   ├── unified_memory_mcp.py # Memory MCP connector
-│   ├── mimo_apex_sync.py    # MiMo-APEX sync
-│   ├── mem0_master_apex.py  # Mem0 integration
-│   ├── map_memory_unification.py # Memory unification
-│   └── sync_case_os.py      # Case OS sync
-├── scripts/                 # Utility scripts
-├── tests/                   # Test suite
-├── apex-*                   # CLI tools (30+)
-├── RECOVERY_GUIDE.md        # Disaster recovery
-└── README.md                # This file
-```
+## Verified public surface
 
-## CLI Tools
+The exact-head Public Truth Gate verifies:
 
-### System
-| Command | Purpose |
-|---------|---------|
-| `apex-daemon` | APEX service daemon |
-| `apex-monitor` | System health monitor |
-| `apex-service` | Service management |
-| `apex-auto-start` | Auto-start services |
-| `apex-cron-setup` | Cron job setup |
+- `./apex help` from the repository checkout;
+- fail-closed handling when an external `job-app` dependency is absent;
+- environment-controlled path resolution in `core/paths.py`;
+- Python compilation for repository-local `core/` and `tests/` surfaces;
+- shell syntax for the main `apex` dispatcher;
+- that the historical Casebuilder/Red-Helix integration harness requires explicit external roots rather than hard-coded device paths.
 
-### Space Management
-| Command | Purpose |
-|---------|---------|
-| `apex-space-monitor` | Quick disk check + cleanup |
-| `apex-space-manager` | Comprehensive report |
-| `apex-space-daemon` | Hourly monitoring daemon |
+The public proof is intentionally narrower than the full historical command inventory.
 
-### Memory & Sync
-| Command | Purpose |
-|---------|---------|
-| `apex-memory` | Holographic memory access |
-| `apex-memory-daemon` | Persistent memory bridge |
-| `apex-prime` | Quick context prime |
-
-### Infrastructure
-| Command | Purpose |
-|---------|---------|
-| `apex-browser-adapter` | Universal browser backend |
-| `apex-paths` | Configurable path resolution |
-| `apex-dropbox-bridge` | Dropbox integration |
-| `apex-dropbox-refresh` | Token refresh |
-
-### Legal & Case
-| Command | Purpose |
-|---------|---------|
-| `apex-legal` | Legal warfare tools |
-| `apex-legal-consolidate` | Case consolidation |
-| `apex-forensics` | Forensic operations |
-| `apex-scan-placeholders` | Code quality scanner |
-
-### Deployment
-| Command | Purpose |
-|---------|---------|
-| `apex-deploy-agent` | Deploy agent |
-| `apex-deploy-masterpiece` | Deploy masterpiece |
-| `apex-deploy-omni` | Deploy omni agent |
-
-### Neural Link (Janus V2)
-| Command | Purpose |
-|---------|---------|
-| `apex-neural-link --maximize` | Start locus + forge Microwave links (steward mode) |
-| `apex-neural-link --brief` | Compact steward brief |
-| `apex-neural-link --context` | Token-cheap context card |
-| `apex-neural-link --status` | Health + active links |
-| `apex-neural-link --reply AGENT TEXT` | Steward → agent outbox |
-
-**Locus:** `servers/synthesizer` on port **8000** (Microwave ↔ Synthesizer-Grok)  
-**State:** `~/.apex/neural_link/` (durable)  
-**Client:** `scripts/establish_neural_link.py`
-
-## Core Modules
-
-| Module | Purpose |
-|--------|---------|
-| `core/browser_adapter.py` | Universal browser (Tasklet/Puppeteer) |
-| `core/paths.py` | Env-aware path resolution |
-| `core/connections.py` | Credential loader |
-| `core/pipeline.py` | Enforced execution pipeline |
-| `core/unified_memory_mcp.py` | Memory MCP connector |
-| `core/mimo_apex_sync.py` | MiMo-APEX synchronization |
-
-## Installation
+## Main dispatcher
 
 ```bash
-git clone https://github.com/GlacierEQ/apex-cli.git
-cd apex-cli
-chmod +x apex-*
-cp apex-* ~/bin/
-# optional: link neural-link client + synthesizer package for $HOME runtime
-mkdir -p ~/scripts ~/servers ~/bin
-ln -sfn "$PWD/scripts/establish_neural_link.py" ~/scripts/establish_neural_link.py
-ln -sfn "$PWD/servers/synthesizer" ~/servers/synthesizer
-ln -sfn "$PWD/apex-neural-link" ~/bin/apex-neural-link
+./apex help
 ```
 
-### Janus neural link (steward)
-
-Requires FastAPI + uvicorn (Aspen Grove venv works):
+Repository-local commands resolve a sibling executable first and then `~/bin`:
 
 ```bash
-# maximize Microwave ↔ Synthesizer for steward
-./apex-neural-link --maximize
-
-# or manually
-export PYTHONPATH=$PWD
-uvicorn servers.synthesizer.main:app --host 0.0.0.0 --port 8000
+./apex daemon
+./apex openclaw --help
 ```
 
-## Recovery
+Commands that depend on a separate job-application checkout require an explicit or default location and fail with exit `78` when their files are unavailable:
 
-If everything breaks:
-1. Reinstall Termux (5 min)
-2. `git clone` this repo (10 min)
-3. Restore credentials (5 min)
-4. Memory auto-restores (5 min)
+```bash
+APEX_JOB_APP_DIR=/path/to/job-app ./apex highway
+APEX_JOB_APP_DIR=/path/to/job-app ./apex hero
+APEX_JOB_APP_DIR=/path/to/job-app ./apex status
+```
 
-See `RECOVERY_GUIDE.md` for details.
+A repository link or local executable lookup is not evidence of live cross-repository integration.
 
----
+## Configurable local paths
 
-## Fleet ops (transparent)
+`core/paths.py` resolves local directories from `APEX_*` environment variables before local configuration/defaults. For example:
 
-This repo may include **`.integrity/`** (SHA-256 baselines / watchdog) and/or a health sidecar.
-These are **documented multi-repo fleet operations**, not covert implants.
+```bash
+export APEX_BASE_DIR="$HOME/automation"
+export APEX_TASKLET_DIR="$APEX_BASE_DIR/tasklet"
+export APEX_WORKSPACE_DIR="$APEX_BASE_DIR/workspace"
+export APEX_TMP_DIR="$APEX_BASE_DIR/tmp"
+```
 
-See [SECURITY_AND_FLEET_OPS.md](SECURITY_AND_FLEET_OPS.md) and
-`~/GlacierEQ_Swarm/state/PORTFOLIO_SHADOW_AND_GAUNTLET.md`.
+Credential loading supports environment variables or a configured local connections file. No credential value is part of the public capability claim.
 
-## Helix strand
+## External integration harness
 
-See [HELIX_STRAND.md](HELIX_STRAND.md) — piston/spiral role in the portfolio double helix.
+`tests/test_end_to_end_casebuild.py` is an **opt-in external harness**, not repository-local proof. It requires both:
+
+```bash
+export APEX_CASEBUILDER_ROOT=/path/to/casebuilder
+export APEX_RED_HELIX_ROOT=/path/to/red-helix
+python tests/test_end_to_end_casebuild.py
+```
+
+The harness imports sibling code only after those roots are explicitly configured and verified as directories. Public CI does not infer that those private/external systems exist.
+
+## CI and proof boundaries
+
+`.github/workflows/public-truth.yml` binds proof to the exact pull-request head or push SHA on Python 3.11 and 3.13.
+
+`.github/workflows/ci.yml` pins its reusable CI dependency to an exact commit of `GlacierEQ/public-actions-runner-host`. Its external benchmark is isolated to scheduled/manual runs so pull-request proof does not depend on external service credentials.
+
+A green public truth gate establishes only the repository-local behavior listed above. It does not establish:
+
+- a live 61-node mesh or agent fleet;
+- production browser automation;
+- live memory/MCP/Dropbox/Neo4j/provider connectivity;
+- deployment authority or successful external deployment;
+- access to private legal/case data;
+- automatic credential availability;
+- runtime operation of AKOS or sibling repositories merely because they are referenced.
+
+## Historical command inventory
+
+The repository preserves many `apex-*` tools and recovery/operations documents. They remain available for inspection and separate verification, but command names such as `deploy`, `legal`, `memory`, `stealth`, `forensics`, or `daemon` are not promoted as current external capabilities without their own evidence.
+
+## Portfolio relationship
+
+- Architecture reference: `GlacierEQ/AKOS`
+- Portfolio classification: `HELIX_STRAND.md`
+- Fleet/integrity notes: `SECURITY_AND_FLEET_OPS.md`
+
+Those relationships are topology/context, not inherited runtime proof.
