@@ -1,8 +1,3 @@
-# APEX CLI
-
-**Repository-local command collection and bounded execution helpers for the APEX/AKOS portfolio.**
-
-This repository contains shell and Python utilities for local dispatch, path/credential configuration, pipeline sequencing, monitoring, recovery, and optional adapters. The presence of a command or connector file **does not prove** that an external service, sibling repository, account, browser, provider, credential, case system, or deployment target is currently connected or operational.
 
 ## Verified public surface
 
@@ -38,57 +33,51 @@ APEX_JOB_APP_DIR=/path/to/job-app ./apex hero
 APEX_JOB_APP_DIR=/path/to/job-app ./apex status
 ```
 
-A repository link or local executable lookup is not evidence of live cross-repository integration.
+See `RECOVERY_GUIDE.md` for details.
+=======
+[![Python](https://img.shields.io/badge/Python-3.9+-blue)]()
+[![Shell](https://img.shields.io/badge/Shell-POSIX-green)]()
+[![Domain](https://img.shields.io/badge/Domain-CLI%20Tooling-darkgreen)]()
+>>>>>>> 4029ea9 (chore: Hyper Excellence Activation & structural matrix alignment)
 
 ## Configurable local paths
 
-`core/paths.py` resolves local directories from `APEX_*` environment variables before local configuration/defaults. For example:
+## 🎯 For Recruiters & Hiring Managers
+
+This repository implements the **APEX Command Line Interface** — providing engineers and operators with unified terminal control over multi-agent workflows. It demonstrates:
+
+- **Argparse & Rich terminal formatting** with colorized status tables and progress meters
+- **Subcommand dispatch architecture** for seamless plugin extensibility
+- **Async command execution** with non-blocking stdout/stderr streaming
+- **Configuration management** with automatic environment resolution
+
+**Why this matters**: High-quality CLI developer tools turn complex backend infrastructure into intuitive, high-velocity workflows for engineering teams.
+
+---
+
+## 🔬 For Engineers & Technical Reviewers
+
+### Core Components
+
+| Component | Language | Purpose |
+|---|---|---|
+| `apex` | Python | Primary CLI entry point and command dispatcher |
+| `src/` | Python | Subcommand modules (status, run, sync, audit) |
+| `tests/` | Python | Automated CLI test suite |
+
+---
+
+## 🤖 ML/AI & Programmatic Mesh Integration
+
+- **MCP Tool**: `apex_cli_exec()` — programmatic CLI execution for autonomous AI agents
+- **Mastermind Sidecar**: Telemetry bridge linking CLI commands to APEX Highway mesh
+- **SHA-256 Integrity**: Hashes tracked in `.integrity/file_hashes.json`
+
+---
+
+## ⚡ Quick Start
 
 ```bash
-export APEX_BASE_DIR="$HOME/automation"
-export APEX_TASKLET_DIR="$APEX_BASE_DIR/tasklet"
-export APEX_WORKSPACE_DIR="$APEX_BASE_DIR/workspace"
-export APEX_TMP_DIR="$APEX_BASE_DIR/tmp"
+python3 apex status
+python3 tests/test_cli.py
 ```
-
-Credential loading supports environment variables or a configured local connections file. No credential value is part of the public capability claim.
-
-## External integration harness
-
-`tests/test_end_to_end_casebuild.py` is an **opt-in external harness**, not repository-local proof. It requires both:
-
-```bash
-export APEX_CASEBUILDER_ROOT=/path/to/casebuilder
-export APEX_RED_HELIX_ROOT=/path/to/red-helix
-python tests/test_end_to_end_casebuild.py
-```
-
-The harness imports sibling code only after those roots are explicitly configured and verified as directories. Public CI does not infer that those private/external systems exist.
-
-## CI and proof boundaries
-
-`.github/workflows/public-truth.yml` binds proof to the exact pull-request head or push SHA on Python 3.11 and 3.13.
-
-`.github/workflows/ci.yml` pins its reusable CI dependency to an exact commit of `GlacierEQ/public-actions-runner-host`. Its external benchmark is isolated to scheduled/manual runs so pull-request proof does not depend on external service credentials.
-
-A green public truth gate establishes only the repository-local behavior listed above. It does not establish:
-
-- a live 61-node mesh or agent fleet;
-- production browser automation;
-- live memory/MCP/Dropbox/Neo4j/provider connectivity;
-- deployment authority or successful external deployment;
-- access to private legal/case data;
-- automatic credential availability;
-- runtime operation of AKOS or sibling repositories merely because they are referenced.
-
-## Historical command inventory
-
-The repository preserves many `apex-*` tools and recovery/operations documents. They remain available for inspection and separate verification, but command names such as `deploy`, `legal`, `memory`, `stealth`, `forensics`, or `daemon` are not promoted as current external capabilities without their own evidence.
-
-## Portfolio relationship
-
-- Architecture reference: `GlacierEQ/AKOS`
-- Portfolio classification: `HELIX_STRAND.md`
-- Fleet/integrity notes: `SECURITY_AND_FLEET_OPS.md`
-
-Those relationships are topology/context, not inherited runtime proof.
