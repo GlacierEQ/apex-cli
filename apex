@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 HOME_DIR="${HOME:-}"
 JOB_APP_DIR="${APEX_JOB_APP_DIR:-${HOME_DIR:+$HOME_DIR/job-app}}"
+RUNTIME_COMMIT="1afda64498ddd90345231cdecec36cd85919a961"
 
 exec_local_or_bin() {
     local command_name="$1"
@@ -24,6 +25,24 @@ require_home() {
         echo "APEX runtime unavailable: HOME is unset" >&2
         exit 78
     fi
+}
+
+runtime_control() {
+    require_home
+    local root="$HOME_DIR/.apex/runtime_projection"
+    local cli="$root/scripts/runtime_cli.py"
+    local compiler="$root/runtime/compiler.py"
+    local contracts="$root/runtime/contracts"
+    if [[ ! -f "$cli" || ! -f "$compiler" || ! -d "$contracts" ]]; then
+        echo "APEX canonical runtime projection unavailable under $root" >&2
+        exit 78
+    fi
+    exec python3 "$cli" \
+        --state-root "$HOME_DIR/.apex/runtime_state" \
+        --contract-dir "$contracts" \
+        --canonical-commit "$RUNTIME_COMMIT" \
+        --compiler-path "$compiler" \
+        "$@"
 }
 
 require_job_app_file() {
@@ -58,31 +77,64 @@ case "$SUBCOMMAND" in
         require_home
         activator="$HOME_DIR/scripts/dynamic_skill_activator.py"
         if [[ ! -f "$activator" ]]; then
-            echo "APEX runtime unavailable: $activator is missing" >&2
+            echo "APEX composition adapter unavailable: $activator is missing" >&2
             exit 78
         fi
         exec python3 "$activator" "${*:-session}"
         ;;
+    runtimectl)
+        runtime_control "$@"
+        ;;
+    replay)
+        require_home
+        target="${1:-$HOME_DIR/.apex/last_runtime_receipt.json}"
+        runtime_control replay "$target"
+        ;;
+    resume)
+        require_home
+        target="${1:-$HOME_DIR/.apex/last_runtime_receipt.json}"
+        runtime_control resume "$target"
+        ;;
+    capabilities)
+        runtime_control capabilities "$@"
+        ;;
+    runtime-health)
+        runtime_control health "$@"
+        ;;
+    governor)
+        if [[ $# -eq 0 || "${1:-}" == "status" ]]; then
+            runtime_control governor-status
+        fi
+        runtime_control "$@"
+        ;;
     runtime-status)
         require_home
         receipt="$HOME_DIR/.apex/last_runtime_receipt.json"
+        composition="$HOME_DIR/.apex/last_composition_receipt.json"
         if [[ ! -f "$receipt" ]]; then
             echo "APEX runtime receipt unavailable: $receipt" >&2
             exit 78
         fi
-        exec python3 - "$receipt" <<'PY'
+        exec python3 - "$receipt" "$composition" <<'PY'
 import json
 import sys
 from pathlib import Path
-path = Path(sys.argv[1])
-data = json.loads(path.read_text(encoding="utf-8"))
+runtime_path = Path(sys.argv[1])
+composition_path = Path(sys.argv[2])
+runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+composition = json.loads(composition_path.read_text(encoding="utf-8")) if composition_path.is_file() else None
 print(json.dumps({
-    "status": data.get("status"),
-    "masterskill": data.get("masterskill"),
-    "at": data.get("at"),
-    "skills": data.get("skills", []),
-    "missing_skills": data.get("missing_skills", []),
-    "receipt": str(path),
+    "status": runtime.get("status"),
+    "schema": runtime.get("schema"),
+    "run_id": runtime.get("run_id"),
+    "canonical_runtime": runtime.get("runtime", {}).get("canonical_repository"),
+    "canonical_commit": runtime.get("runtime", {}).get("canonical_commit"),
+    "current_stage": runtime.get("continuation", {}).get("current_stage"),
+    "completed_stages": runtime.get("continuation", {}).get("completed_stages", []),
+    "blockers": runtime.get("blockers", []),
+    "composition_status": composition.get("status") if composition else None,
+    "composition_skills": composition.get("skills", []) if composition else [],
+    "receipt": str(runtime_path),
 }, indent=2))
 PY
         ;;
@@ -116,13 +168,19 @@ PY
 Usage: apex <command> [args]
 
 Nervous-system runtime:
-  apex boot [objective]             Boot, compose, verify, and emit a runtime receipt
-  apex compose [objective]          Recompute the current skill composition
-  apex runtime-status               Read the latest composition receipt
+  apex boot [objective]             Boot through the canonical resumable runtime
+  apex compose [objective]          Recompute host skill composition evidence
+  apex runtime-status               Read canonical runtime + composition state
+  apex capabilities [args]          Read/select TTL-bound live capability state
+  apex replay [receipt]             Attest compiler/contracts/skills/predicates
+  apex resume [receipt|run_id]      Resume at the first incomplete lifecycle stage
+  apex runtime-health [args]        Report runtime metrics and SLO evaluation
+  apex governor [status]            Read resource-governor state
+  apex runtimectl <command> ...     Full canonical runtime control surface
 
 Repository-local commands:
-  apex openclaw [action] [target]   Run the apex-openclaw command if installed here or in ~/bin
-  apex daemon                       Run the apex-daemon command if installed here or in ~/bin
+  apex openclaw [action] [target]   Run apex-openclaw if installed here or in ~/bin
+  apex daemon                       Run apex-daemon if installed here or in ~/bin
 
 Explicit external job-app commands:
   apex highway                      Run apex_highway.py from APEX_JOB_APP_DIR
