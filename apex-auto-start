@@ -1,36 +1,63 @@
 #!/usr/bin/env bash
-# APEX Auto-Start — Runs on boot, no manual intervention needed
+# APEX Auto-Start — nervous-system runtime first, legacy services optional.
 set -euo pipefail
 
-APEX_DIR="$HOME/.apex_automation"
-LOG_DIR="$APEX_DIR/logs"
-PID_DIR="$APEX_DIR/pids"
-mkdir -p "$LOG_DIR" "$PID_DIR"
-
-echo "[APEX] Boot sequence starting..."
-
-# 1. Start Google Drive Watcher (daemon)
-nohup python3 "$APEX_DIR/gdrive_final/gdrive_watcher.py" watch >> "$LOG_DIR/gdrive_watcher.log" 2>&1 &
-echo $! > "$PID_DIR/gdrive_watcher.pid"
-echo "[APEX] ✅ GDrive Watcher started (PID: $(cat $PID_DIR/gdrive_watcher.pid))"
-
-# 2. Start GDrive Intelligence scan (once on boot)
-python3 "$APEX_DIR/gdrive_final/gdrive_intel.py" scan >> "$LOG_DIR/gdrive_intel.log" 2>&1 &
-echo "[APEX] ✅ GDrive Intelligence scan started"
-
-# 3. Run FILEBOSS on boot
-python3 "$APEX_DIR/gdrive_final/fileboss.py" --source gdrive >> "$LOG_DIR/fileboss.log" 2>&1 &
-echo "[APEX] ✅ FILEBOSS started"
-
-# 4. Run pipeline orchestrator
-python3 "$APEX_DIR/gdrive/pipeline_orchestrator.py" all >> "$LOG_DIR/pipelines.log" 2>&1 &
-echo "[APEX] ✅ Pipelines started"
-
-# 5. Start MCP Hub (if available)
-if [ -f "$APEX_DIR/orchestrator/mcp_hub.py" ]; then
-    echo "[APEX] ✅ MCP Hub available"
+HOME_DIR="${HOME:-}"
+if [[ -z "$HOME_DIR" ]]; then
+  echo "[APEX AUTO-START] HOME unavailable" >&2
+  exit 78
 fi
 
-# 6. Log boot completion
-echo "[APEX] Boot complete at $(date)" >> "$LOG_DIR/boot.log"
-echo "[APEX] 🚀 All systems operational"
+APEX_BIN="${APEX_BIN:-$HOME_DIR/bin/apex}"
+if [[ ! -x "$APEX_BIN" ]]; then
+  echo "[APEX AUTO-START] dispatcher unavailable: $APEX_BIN" >&2
+  exit 78
+fi
+
+echo "[APEX AUTO-START] entering nervous-system runtime..."
+"$APEX_BIN" boot "system startup"
+"$APEX_BIN" runtime-status
+
+# Legacy background services are compatibility integrations, not the boot authority.
+# Enable only when a host intentionally still depends on this old automation tree.
+if [[ "${APEX_ENABLE_LEGACY_AUTOSTART:-0}" != "1" ]]; then
+  echo "[APEX AUTO-START] runtime READY; legacy automation disabled"
+  exit 0
+fi
+
+LEGACY_DIR="$HOME_DIR/.apex_automation"
+LOG_DIR="$LEGACY_DIR/logs"
+PID_DIR="$LEGACY_DIR/pids"
+mkdir -p "$LOG_DIR" "$PID_DIR"
+
+echo "[APEX AUTO-START] legacy compatibility mode enabled"
+
+start_daemon() {
+  local name="$1"
+  shift
+  nohup "$@" >> "$LOG_DIR/$name.log" 2>&1 &
+  local pid=$!
+  echo "$pid" > "$PID_DIR/$name.pid"
+  sleep 0.2
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "[APEX AUTO-START] legacy service failed immediately: $name" >&2
+    return 1
+  fi
+  echo "[APEX AUTO-START] legacy service started: $name pid=$pid"
+}
+
+if [[ -f "$LEGACY_DIR/gdrive_final/gdrive_watcher.py" ]]; then
+  start_daemon gdrive_watcher python3 "$LEGACY_DIR/gdrive_final/gdrive_watcher.py" watch
+fi
+if [[ -f "$LEGACY_DIR/gdrive_final/gdrive_intel.py" ]]; then
+  start_daemon gdrive_intel python3 "$LEGACY_DIR/gdrive_final/gdrive_intel.py" scan
+fi
+if [[ -f "$LEGACY_DIR/gdrive_final/fileboss.py" ]]; then
+  start_daemon fileboss python3 "$LEGACY_DIR/gdrive_final/fileboss.py" --source gdrive
+fi
+if [[ -f "$LEGACY_DIR/gdrive/pipeline_orchestrator.py" ]]; then
+  start_daemon pipelines python3 "$LEGACY_DIR/gdrive/pipeline_orchestrator.py" all
+fi
+
+printf '[APEX AUTO-START] verified runtime boot completed at %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$LOG_DIR/boot.log"
+echo "[APEX AUTO-START] nervous-system runtime READY; requested legacy services launched with liveness checks"
