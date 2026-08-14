@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -75,6 +76,19 @@ def test_installer_places_canonical_dispatcher(tmp_path: Path) -> None:
     )
     assert help_result.returncode == 0
     assert "Usage: apex" in help_result.stdout
+
+
+def test_canonical_semantics_bind_payloads_not_fragment_containers() -> None:
+    manifest = json.loads(
+        (ROOT / "bundle" / "runtime-projection" / "CANONICAL_SEMANTICS.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["canonical_repository"] == "GlacierEQ/apex-boot-core"
+    assert manifest["canonical_commit"] == "84a2907a316327e91dc0426f5407a34908aa4fc4"
+    assert manifest["files"]
+    assert all(len(digest) == 64 for digest in manifest["files"].values())
+    assert all("git_blob_sha1" not in part for part in manifest["parts"])
 
 
 def test_paths_module_honors_explicit_environment_root(tmp_path: Path) -> None:
