@@ -1,13 +1,13 @@
 {
-  "schema": "glaciereq.canonical-runtime-semantics.v1",
+  "schema": "glaciereq.canonical-runtime-semantics.v2",
   "canonical_repository": "GlacierEQ/apex-boot-core",
   "canonical_commit": "84a2907a316327e91dc0426f5407a34908aa4fc4",
   "parts": [
-    {"name": "canonical_part_00.txt", "git_blob_sha1": "66c4c74e04002b3554eb85f0a312b6d027888b9b"},
-    {"name": "canonical_part_01.txt", "git_blob_sha1": "d61cfc1d6e136385a91ceaf9e9afe5f19be522d8"},
-    {"name": "canonical_part_02.txt", "git_blob_sha1": "428b709ee1cda2903f235c0e68a71f88df80615b"},
-    {"name": "canonical_part_03.txt", "git_blob_sha1": "18b3d96e2b7c062463cdf8a2e3462e5456cf669c"},
-    {"name": "canonical_part_04.txt", "git_blob_sha1": "877628d3082f1353424188fe9dedbdf4f88aae91"}
+    {"name": "canonical_part_00.txt"},
+    {"name": "canonical_part_01.txt"},
+    {"name": "canonical_part_02.txt"},
+    {"name": "canonical_part_03.txt"},
+    {"name": "canonical_part_04.txt"}
   ],
   "files": {
     "runtime/compiler.py": "eb4a94f873d8d545087effd05fe18eb1373a70390f67605d967ed1cbced48409",
@@ -21,5 +21,5 @@
     "runtime/contracts/slo.json": "7710eaea0292710e989ce1b58839e9beeaea9ae210726d7e0bdf1b8602a8c803",
     "runtime/contracts/projection.schema.json": "2ede5d920d5d61f5957692f995497d4972138e77bdf1ed828a7348725d613cbc"
   },
-  "law": "Semantics are exact bytes from the pinned private authority. Public CLI and verification mechanics are adapters and may not redefine these contracts."
+  "law": "Fragment files are transparent transport containers only. Authority is the pinned canonical commit plus exact SHA-256 identities of every reconstructed semantic file; fragment-container Git blob identities are intentionally non-authoritative. Public CLI and verification mechanics are adapters and may not redefine these contracts."
 }
