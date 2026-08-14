@@ -17,12 +17,14 @@ BUNDLE_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME_DIR/bin"
 CONFIG_DIR="$HOME_DIR/.apex"
 MEMORY_DIR="$HOME_DIR/.local/share/mimocode/memory"
+SKILL_DIR="$HOME_DIR/.agents/skills"
+SCRIPT_DIR="$HOME_DIR/scripts"
 
-# Create directories
+# Create directories.
 echo "Creating directories..."
-mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$MEMORY_DIR"
+mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$MEMORY_DIR" "$SKILL_DIR" "$SCRIPT_DIR"
 
-# Install CLI tools and the canonical dispatcher.
+# Install CLI tools and canonical dispatcher.
 echo "Installing CLI tools..."
 if [[ -f "$BUNDLE_DIR/apex" ]]; then
     cp "$BUNDLE_DIR/apex" "$BIN_DIR/apex"
@@ -39,7 +41,7 @@ if [[ ! -x "$BIN_DIR/apex" ]]; then
 fi
 echo "  CLI tools installed to ~/bin/"
 
-# Install core modules
+# Install core modules.
 echo "Installing core modules..."
 mkdir -p "$CONFIG_DIR/core"
 for module in "$BUNDLE_DIR"/core/*.py; do
@@ -48,29 +50,54 @@ for module in "$BUNDLE_DIR"/core/*.py; do
 done
 echo "  Core modules installed"
 
-# Install config
-echo "Installing config..."
-if [[ -f "$BUNDLE_DIR/config/AGENTS.md" ]]; then
-    cp "$BUNDLE_DIR/config/AGENTS.md" "$HOME_DIR/"
-elif [[ -f "$BUNDLE_DIR/AGENTS.md" ]]; then
-    cp "$BUNDLE_DIR/AGENTS.md" "$HOME_DIR/"
-fi
-echo "  AGENTS.md checked"
+# Install nervous-system runtime config.
+echo "Installing nervous-system runtime config..."
+for runtime_file in MASTERSKILL_ACTIVATION.json startup.sh; do
+    source_file="$BUNDLE_DIR/bundle/config/$runtime_file"
+    [[ -f "$source_file" ]] || continue
+    cp "$source_file" "$CONFIG_DIR/$runtime_file"
+done
+[[ -f "$CONFIG_DIR/startup.sh" ]] && chmod +x "$CONFIG_DIR/startup.sh"
 
-# Install scripts
+# Install operator instructions.
+if [[ -f "$BUNDLE_DIR/bundle/config/AGENTS.md" ]]; then
+    cp "$BUNDLE_DIR/bundle/config/AGENTS.md" "$HOME_DIR/AGENTS.md"
+elif [[ -f "$BUNDLE_DIR/config/AGENTS.md" ]]; then
+    cp "$BUNDLE_DIR/config/AGENTS.md" "$HOME_DIR/AGENTS.md"
+elif [[ -f "$BUNDLE_DIR/AGENTS.md" ]]; then
+    cp "$BUNDLE_DIR/AGENTS.md" "$HOME_DIR/AGENTS.md"
+fi
+
+# Install runtime baseline skills without overwriting richer host copies.
+echo "Installing nervous-system baseline skills..."
+if [[ -d "$BUNDLE_DIR/bundle/skills" ]]; then
+    for skill_source in "$BUNDLE_DIR"/bundle/skills/*; do
+        [[ -d "$skill_source" ]] || continue
+        skill_name="$(basename "$skill_source")"
+        target="$SKILL_DIR/$skill_name"
+        if [[ -f "$target/SKILL.md" ]]; then
+            echo "  preserving existing $skill_name"
+            continue
+        fi
+        mkdir -p "$target"
+        cp -R "$skill_source"/. "$target"/
+        echo "  installed $skill_name"
+    done
+fi
+
+# Install scripts, including the composition compiler projection.
 echo "Installing scripts..."
-mkdir -p "$HOME_DIR/scripts"
 for script_dir in "$BUNDLE_DIR/scripts" "$BUNDLE_DIR/bundle/scripts"; do
     [[ -d "$script_dir" ]] || continue
     for script in "$script_dir"/*.py "$script_dir"/*.sh; do
         [[ -f "$script" ]] || continue
-        cp "$script" "$HOME_DIR/scripts/"
+        cp "$script" "$SCRIPT_DIR/"
     done
 done
-chmod +x "$HOME_DIR/scripts/"*.sh 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/"*.sh 2>/dev/null || true
 echo "  Scripts installed"
 
-# Install Janus neural link (synthesizer + client) when present.
+# Install Janus neural link when present.
 echo "Installing neural link (optional)..."
 mkdir -p "$HOME_DIR/servers"
 if [[ -d "$BUNDLE_DIR/servers/synthesizer" ]]; then
@@ -93,16 +120,36 @@ for test_file in "$BUNDLE_DIR"/tests/*.py; do
     cp "$test_file" "$HOME_DIR/tests/"
 done
 
-# Verify the public dispatcher rather than inferring optional integrations.
+# Verify runtime installation rather than inferring it from copied files.
 echo ""
 echo "=== VERIFICATION ==="
 "$BIN_DIR/apex" help >/dev/null
+
+for required in \
+    "$CONFIG_DIR/MASTERSKILL_ACTIVATION.json" \
+    "$CONFIG_DIR/startup.sh" \
+    "$SCRIPT_DIR/dynamic_skill_activator.py" \
+    "$SKILL_DIR/glaciereq-nervous-system/SKILL.md" \
+    "$SKILL_DIR/apex-aspen-grove-bootup/SKILL.md" \
+    "$SKILL_DIR/verification/SKILL.md"
+do
+    if [[ ! -e "$required" ]]; then
+        echo "Runtime installation failed: missing $required" >&2
+        exit 1
+    fi
+done
+
+python3 "$SCRIPT_DIR/dynamic_skill_activator.py" "session" >/dev/null
+"$BIN_DIR/apex" runtime-status >/dev/null
+
 printf 'Dispatcher: %s\n' "$BIN_DIR/apex"
+printf 'Runtime activation: %s\n' "$CONFIG_DIR/MASTERSKILL_ACTIVATION.json"
+printf 'Runtime receipt: %s\n' "$CONFIG_DIR/last_runtime_receipt.json"
 TOOL_COUNT=$(find "$BIN_DIR" -maxdepth 1 -type f -name 'apex*' | wc -l | tr -d ' ')
 CORE_COUNT=$(find "$CONFIG_DIR/core" -maxdepth 1 -type f -name '*.py' | wc -l | tr -d ' ')
-SCRIPT_COUNT=$(find "$HOME_DIR/scripts" -maxdepth 1 -type f | wc -l | tr -d ' ')
+SCRIPT_COUNT=$(find "$SCRIPT_DIR" -maxdepth 1 -type f | wc -l | tr -d ' ')
 printf 'CLI tools: %s\nCore modules: %s\nScripts: %s\n' "$TOOL_COUNT" "$CORE_COUNT" "$SCRIPT_COUNT"
 
 echo ""
 echo "=== INSTALL COMPLETE ==="
-echo "Ensure ~/bin is on PATH, then run: apex help"
+echo "Ensure ~/bin is on PATH, then run: apex boot \"<objective>\""
