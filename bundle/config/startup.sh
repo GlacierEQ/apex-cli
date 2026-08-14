@@ -115,7 +115,6 @@ PY
 for _ in 1 2 3 4 5 6 7 8; do
   runtime advance "$RUN_ID" >/dev/null
 done
-runtime finalize "$RUN_ID" READY >/dev/null
 
 mkdir -p "$RUNTIME_STATE"
 SKILLS_JSON="$RUNTIME_STATE/boot_skills.json"
@@ -155,5 +154,17 @@ path = Path(sys.argv[1])
 data = json.loads(path.read_text(encoding="utf-8"))
 if data.get("schema") != "glaciereq.runtime-receipt.v2" or data.get("status") != "READY":
     raise SystemExit(f"[APEX STARTUP] failed: canonical receipt invalid: {data.get('schema')} {data.get('status')}")
+PY
+
+# READY is a terminal lifecycle claim. Publish it only after durable boot state,
+# canonical receipt creation, replay attestation, and external receipt persistence
+# have all succeeded. Any earlier failure leaves the run resumable rather than lying.
+runtime finalize "$RUN_ID" READY >/dev/null
+
+python3 - "$APEX_DIR/last_runtime_receipt.json" <<'PY'
+import json, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
 print(f"[APEX STARTUP] READY run={data['run_id']} canonical={data['runtime']['canonical_commit']} receipt={path}")
 PY
