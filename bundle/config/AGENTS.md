@@ -1,14 +1,28 @@
-# APEX Operator — Grok Agent Rules (Double Helix)
+# APEX Operator — Agent Rules (Nervous System + Double Helix)
 
-BINDING: `DOUBLE_HELIX:PRO_CODE_KNOWLEDGE` v1.1 | MANTRA: Two strands. One sovereign DNA.
+BINDING: `GLACIEREQ-NERVOUS-SYSTEM -> DOUBLE_HELIX:PRO_CODE_KNOWLEDGE`
 
-## Helix Loading Order (mandatory context)
+## Mission entrypoint
 
-0. `~/.apex/STARTUP_STATE.json` — saved startup snapshot (connectors, skills, gaps)
-1. `Pro_Code/CODER-SKILL.md` — identity, execution laws
-2. `Pro_Code/STYLE.md` — naming, commits
-3. `pro-code/KNOWLEDGE.md` — Spiral Engine bridge
-4. `~/.supermemory/ops/live-context.md` — primed Mem0+Supermemory context (token savings)
+For complex GlacierEQ missions, load the `glaciereq-nervous-system` masterskill first when available.
+
+Canonical source: `GlacierEQ/antigravity-awesome-skills/skills/glaciereq-nervous-system/SKILL.md`  
+Canonical commit: `6e3bcf71e8d79c682dbe8993a012b761d0a19390`
+
+Lifecycle:
+
+`DISCOVER -> MAP -> REUSE -> EXTEND -> EXECUTE -> VERIFY -> PERSIST`
+
+The masterskill composes existing systems. It does not replace them. Apex Boot Core owns boot/state initialization, the Double Helix owns engineering doctrine/execution, and Tower of Babel owns technology placement and proof.
+
+## Loading order
+
+0. `~/.apex/MASTERSKILL_ACTIVATION.json` — cross-platform composition contract
+1. `~/.apex/STARTUP_STATE.json` — saved startup snapshot (connectors, skills, gaps)
+2. `Pro_Code/CODER-SKILL.md` — identity, execution laws
+3. `Pro_Code/STYLE.md` — naming, commits
+4. `pro-code/KNOWLEDGE.md` — execution / Spiral Engine bridge
+5. `~/.supermemory/ops/live-context.md` — primed memory context
 
 Session boot: `apex-startup` or `source ~/.apex/session_boot.env`
 
@@ -16,41 +30,50 @@ Session boot: `apex-startup` or `source ~/.apex/session_boot.env`
 
 - Operator identity, surgical edits, gap analysis before building
 - One Big Push commits, verify carryover, no sprawl
-- Aspen Grove token efficiency: tables over prose, no acknowledgment theater
+- Engineering doctrine, standards, and repository contracts
 
 ## Omega (pro-code) — specialize in
 
-- Execution: workers mesh, Nexus API, CI templates, React control surface
-- Memory tiers: Supabase → Pinecone/Mem0 → Neo4j/Supermemory → cold archive
+- Execution: workers mesh, Nexus API, CI templates, control surfaces
+- Governed implementation, verification, repair-forward execution
 
-## Memory & token savings (always)
+## Memory and context
 
 ```bash
-sm-ops prime "current task"    # before work (~1200t budget)
-sm-ops save "outcome" --durable # after durable learnings
-apex-prime "task"              # ChatGPT/Perplexity paste workflow
+sm-ops prime "current task"
+sm-ops save "outcome" --durable
+apex-prime "task"
 ```
 
-Prefer `[M]` Mem0 episodic + `[S]` Supermemory knowledge from live context. Do not reload full chat history.
+Prefer targeted memory retrieval over reloading full histories. Recover current state before rebuilding knowledge.
 
-## MCP connectors (use proactively)
+## MCP connectors
 
-- `unified-memory` — semantic router across Mem0/Pinecone/Neo4j/Supermemory
-- `supermemory` — long-term knowledge, profiles, search
+- `unified-memory` — semantic routing across available memory layers
+- `supermemory` — long-term knowledge and profiles
+- host-native MCP/connectors — execution surfaces selected by the masterskill
 
-## Quality & stability
+## Technology placement
 
-- Read before write. Match existing code style.
-- Focused diffs only — no drive-by refactors.
-- Fail fast, retry once, then escalate approach.
-- Batch related changes; verify after every major operation.
+When a mission changes language, runtime, schema, interface, toolchain, hardware dependency, benchmark claim, or formal proof boundary, use `GlacierEQ/the-tower-of-babel` before implementation.
+
+## Quality and stability
+
+- Read before write.
+- Reuse existing authority before creating another system.
+- Focused diffs only; no novelty refactors.
+- Verify after every material operation.
+- Never claim completion without verified target state and persistence.
+- Preserve exact blockers and continuation points.
 
 ## Paths
 
-| Strand | Canonical |
-|--------|-----------|
-| Alpha | `~/Pro_Code` → `MISSIONS/PRO_AGENTS/Pro_Code` |
-| Omega | `~/pro-code` → `MISSIONS/PRO_AGENTS/pro-code` |
+| Plane | Canonical |
+|---|---|
+| Masterskill | `GlacierEQ/antigravity-awesome-skills/skills/glaciereq-nervous-system/` |
+| Boot | `GlacierEQ/apex-boot-core` |
+| Alpha | `~/Pro_Code` |
+| Omega | `~/pro-code` |
+| Technology | `GlacierEQ/the-tower-of-babel` |
 | Memory ops | `~/.agents/skills/supermemory-cli/` (`sm-ops`) |
 | Unified MCP | `~/scripts/unified_memory_mcp.py` |
-| Blink → Termux | `~/.apex/BLINK_ACCESS.json` — Hosts → **apex-termux** · verify `uname=Linux` |
