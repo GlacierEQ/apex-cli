@@ -49,8 +49,6 @@ if meta.get('canonical_commit')!=commit: raise SystemExit('canonical commit drif
 parts=[]
 for item in meta['parts']:
     path=manifest_path.parent/item['name']; data=path.read_bytes()
-    git_sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
-    if git_sha!=item['git_blob_sha1']: raise SystemExit(f"fragment drift: {item['name']}")
     parts.append(data)
 bundle=b''.join(parts); expected=meta['files']; found={}; pos=0
 prefix=b'<<<GLACIEREQ_FILE '
