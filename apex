@@ -37,7 +37,14 @@ case "$SUBCOMMAND" in
   resume) require_home; runtime_control resume "${1:-$HOME_DIR/.apex/last_runtime_receipt.json}" ;;
   capabilities) runtime_control capabilities "$@" ;;
   runtime-health) runtime_control health "$@" ;;
-  governor) if [[ $# -eq 0 || "${1:-}" == "status" ]]; then runtime_control governor-status; else runtime_control "$@"; fi ;;
+  governor)
+    if [[ $# -eq 0 || "${1:-}" == "status" ]]; then
+      runtime_control governor-status
+    else
+      sub="$1"; shift
+      runtime_control "governor-$sub" "$@"
+    fi
+    ;;
   runtime-status)
     require_home; receipt="$HOME_DIR/.apex/last_runtime_receipt.json"; composition="$HOME_DIR/.apex/last_composition_receipt.json"
     [[ -f "$receipt" ]] || { echo "APEX runtime receipt unavailable: $receipt" >&2; exit 78; }
@@ -65,7 +72,7 @@ Nervous-system runtime:
   apex replay [receipt]             Attest compiler/contracts/skills/predicates
   apex resume [receipt|run_id]      Resume at the first incomplete lifecycle stage
   apex runtime-health [args]        Report runtime metrics and SLO evaluation
-  apex governor [status]            Read resource-governor state
+  apex governor [status|action]     Read or invoke resource-governor controls
   apex runtimectl <command> ...     Full canonical runtime control surface
 
 Repository-local commands:
