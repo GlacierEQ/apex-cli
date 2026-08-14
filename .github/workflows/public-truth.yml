@@ -16,7 +16,7 @@ jobs:
       matrix:
         python-version: ["3.11", "3.13"]
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,28 +52,115 @@ jobs:
           bash -n apex install.sh apex-auto-start bundle/config/startup.sh
           ./apex help >/tmp/apex-help.txt
           grep -q 'External job-app commands fail closed' /tmp/apex-help.txt
+          grep -q 'apex replay' /tmp/apex-help.txt
+          grep -q 'apex resume' /tmp/apex-help.txt
 
-      - name: Prove fresh-install nervous-system runtime
+      - name: Prove fresh-install canonical runtime
         shell: bash
         run: |
           runtime_home="$(mktemp -d)"
-          HOME="$runtime_home" bash ./install.sh >/tmp/apex-install.txt
-          test -f "$runtime_home/.apex/MASTERSKILL_ACTIVATION.json"
-          test -x "$runtime_home/.apex/startup.sh"
-          test -f "$runtime_home/.agents/skills/glaciereq-nervous-system/SKILL.md"
-          test -f "$runtime_home/.agents/skills/apex-aspen-grove-bootup/SKILL.md"
-          test -f "$runtime_home/.agents/skills/verification/SKILL.md"
+          export HOME="$runtime_home"
+          bash ./install.sh >/tmp/apex-install.txt
+          apex="$runtime_home/bin/apex"
+          commit="84a2907a316327e91dc0426f5407a34908aa4fc4"
+
+          test -f "$runtime_home/.apex/runtime_projection/RUNTIME_PROJECTION.json"
+          test -f "$runtime_home/.apex/runtime_projection/runtime/hardening.py"
           test -f "$runtime_home/.apex/last_runtime_receipt.json"
-          HOME="$runtime_home" "$runtime_home/bin/apex" runtime-status >/tmp/apex-runtime-status.json
-          python - "$runtime_home/.apex/last_runtime_receipt.json" <<'PY'
-          import json
-          import sys
+          python "$runtime_home/.apex/runtime_projection/scripts/verify_runtime_projection.py" --root "$runtime_home/.apex/runtime_projection" --expect-commit "$commit" >/tmp/projection-proof.json
+
+          "$apex" runtime-status >/tmp/runtime-status.json
+          "$apex" replay "$runtime_home/.apex/last_runtime_receipt.json" >/tmp/replay.json
+          python - "$runtime_home/.apex/last_runtime_receipt.json" /tmp/runtime-status.json /tmp/replay.json "$commit" <<'PY'
+          import json,sys
           from pathlib import Path
-          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          receipt=json.loads(Path(sys.argv[1]).read_text())
+          status=json.loads(Path(sys.argv[2]).read_text())
+          replay=json.loads(Path(sys.argv[3]).read_text())
+          commit=sys.argv[4]
+          assert receipt["schema"] == "glaciereq.runtime-receipt.v2", receipt
           assert receipt["status"] == "READY", receipt
-          assert receipt["masterskill"] == "glaciereq-nervous-system", receipt
-          assert receipt["skills"][0]["name"] == "glaciereq-nervous-system", receipt
-          assert not receipt["missing_skills"], receipt
+          assert receipt["runtime"]["canonical_repository"] == "GlacierEQ/apex-boot-core", receipt
+          assert receipt["runtime"]["canonical_commit"] == commit, receipt
+          assert "PERSIST" in receipt["continuation"]["completed_stages"], receipt
+          assert receipt["attestation_payload_sha256"], receipt
+          assert status["composition_status"] == "READY", status
+          assert replay["status"] == "VERIFIED", replay
+          assert any(c["name"] == "canonical_commit" and c["passed"] for c in replay["checks"]), replay
+          PY
+
+      - name: Prove capability freshness and inventory truth
+        shell: bash
+        run: |
+          apex="$HOME/bin/apex"
+          cat > /tmp/inventory.json <<'JSON'
+          {"schema":"glaciereq.capability-inventory.v2","capabilities":[
+            {"capability_id":"connector.unprobed","kind":"connector","provider":"demo","ttl_seconds":900},
+            {"capability_id":"model.verified","kind":"model","provider":"demo","ttl_seconds":900,"probe":{"connected":true,"authenticated":true,"authorized":true,"invokable":true,"verified":true,"latency_ms":7}}
+          ]}
+          JSON
+          "$apex" runtimectl capability-import --inventory-json /tmp/inventory.json >/tmp/import.json
+          "$apex" capabilities >/tmp/caps.json
+          "$apex" runtimectl capability-register connector.expiring connector demo --ttl 0 >/dev/null
+          "$apex" runtimectl capability-probe connector.expiring --connected --authenticated --authorized --invokable --verified --latency-ms 2 >/dev/null
+          "$apex" runtimectl capabilities --eligible-only --minimum-state VERIFIED >/tmp/eligible.json
+          python - /tmp/caps.json /tmp/eligible.json <<'PY'
+          import json,sys
+          from pathlib import Path
+          caps=json.loads(Path(sys.argv[1]).read_text())["capabilities"]
+          eligible={x["capability_id"] for x in json.loads(Path(sys.argv[2]).read_text())["capabilities"]}
+          assert caps["connector.unprobed"]["state"] == "DISCOVERED"
+          assert caps["model.verified"]["effective_state"] == "VERIFIED"
+          assert "connector.unprobed" not in eligible
+          assert "connector.expiring" not in eligible
+          PY
+
+      - name: Prove resume and idempotent side effects
+        shell: bash
+        run: |
+          apex="$HOME/bin/apex"
+          "$apex" runtimectl start "resume proof" --run-id resume-proof >/dev/null
+          "$apex" runtimectl advance resume-proof >/dev/null
+          "$apex" runtimectl checkpoint resume-proof --cursor-json '{"stage":"CAPABILITY_PROBE","action_index":7}' --dependencies-json '["connector.github"]' >/dev/null
+          "$apex" resume resume-proof >/tmp/resume.json
+
+          "$apex" runtimectl action-begin resume-proof merge repo#8 merge-proof --precondition-hash before --compensation-pointer revert#8 >/tmp/action1.json
+          op="$(python -c 'import json;print(json.load(open("/tmp/action1.json"))["operation_id"])')"
+          "$apex" runtimectl action-complete "$op" --result-json '{"merged":true}' --readback-json '{"state":"merged"}' --postcondition-hash after >/dev/null
+          "$apex" runtimectl action-begin resume-proof merge repo#8 merge-proof >/tmp/action2.json
+          python - /tmp/resume.json /tmp/action2.json <<'PY'
+          import json,sys
+          from pathlib import Path
+          resume=json.loads(Path(sys.argv[1]).read_text())
+          action=json.loads(Path(sys.argv[2]).read_text())
+          assert resume["resumable"] is True, resume
+          assert resume["next_stage"] == "CAPABILITY_PROBE", resume
+          assert resume["cursor"]["action_index"] == 7, resume
+          assert action["status"] == "COMPLETE", action
+          assert action["must_not_repeat"] is True, action
+          PY
+
+      - name: Prove governor economics and runtime health
+        shell: bash
+        run: |
+          apex="$HOME/bin/apex"
+          cat > /tmp/governor.json <<'JSON'
+          {"worker_slots":1,"connector_concurrency":1,"provider_concurrency":{"model":1},"token_budget":100,"context_budget":10,"retry_limit":2,"deadline_seconds":3600}
+          JSON
+          "$apex" runtimectl governor-acquire model infer --estimated-context-tokens 11 --config-json /tmp/governor.json >/tmp/context-denial.json
+          "$apex" runtimectl governor-provider-state github --quota-remaining 0 --reset-after 60 --config-json /tmp/governor.json >/dev/null
+          "$apex" runtimectl governor-acquire github write --config-json /tmp/governor.json >/tmp/quota-denial.json
+          "$apex" runtime-health >/tmp/health.json
+          python - /tmp/context-denial.json /tmp/quota-denial.json /tmp/health.json <<'PY'
+          import json,sys
+          from pathlib import Path
+          context=json.loads(Path(sys.argv[1]).read_text())
+          quota=json.loads(Path(sys.argv[2]).read_text())
+          health=json.loads(Path(sys.argv[3]).read_text())
+          assert context["admitted"] is False and context["reason"] == "context_budget", context
+          assert quota["admitted"] is False and quota["reason"] == "provider_quota", quota
+          assert health["schema"] == "glaciereq.runtime-health.v2", health
+          assert "tool_success_rate" in health and "slo_evaluation" in health, health
           PY
 
       - name: Verify public boundary
