@@ -1,0 +1,29 @@
+name: Sync Runtime Installer V2
+
+on:
+  push:
+    branches: [feat/canonical-runtime-projection-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/canonical-runtime-projection-v2
+          fetch-depth: 0
+      - name: Synchronize installer
+        shell: bash
+        run: |
+          cp install-runtime-v2.sh install.sh
+          chmod +x install.sh
+          if git diff --quiet -- install.sh; then exit 0; fi
+          git config user.name "glaciereq-runtime-bot"
+          git config user.email "runtime-bot@users.noreply.github.com"
+          git add install.sh
+          git commit -m "chore(runtime): synchronize canonical public installer"
+          git push origin HEAD:feat/canonical-runtime-projection-v2
