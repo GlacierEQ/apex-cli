@@ -129,7 +129,8 @@ Explicit external job-app commands:
   apex hero                         Run demo_heroes.sh from APEX_JOB_APP_DIR
   apex status                       Run highway + governance scripts from APEX_JOB_APP_DIR
 
-External dependencies fail closed with exit 78 when their required files are absent.
+External job-app commands fail closed with exit 78 when their required files are absent.
+Other external runtime dependencies also fail closed when required artifacts are unavailable.
 EOF
         ;;
     *)
