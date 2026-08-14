@@ -8,6 +8,7 @@ bootstrap
 chat-sdk
 env-vars
 frontend-ui-toolkit
+glaciereq-nervous-system
 knowledge-update
 legal-automation-suite
 marketplace
