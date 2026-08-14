@@ -1,0 +1,234 @@
+lf.paths).record("action_completed",1,{"provider":entry.get("provider") or "unknown","action":entry["action"]}); return {**entry,"reused":False,"must_not_repeat":True}
+
+    def fail(self,operation_id:str,*,error:str,retryable:bool,retry_after_seconds:int|None=None)->dict[str,Any]:
+        index=self._load(); entry=index.setdefault("operations",{}).get(operation_id)
+        if not entry: raise KeyError(operation_id)
+        entry.update({"status":"FAILED","error":error,"retryable":bool(retryable),"retry_after_seconds":retry_after_seconds,"updated_at":utc_now()}); self._save(index); append_jsonl(self.paths.action_log,{"event":"FAIL","at":utc_now(),**entry}); MetricsRecorder(self.paths).record("action_failed",1,{"provider":entry.get("provider") or "unknown","action":entry["action"]}); return entry
+
+    def retry(self,operation_id:str,*,reconciliation:Mapping[str,Any])->dict[str,Any]:
+        index=self._load(); entry=index.setdefault("operations",{}).get(operation_id)
+        if not entry: raise KeyError(operation_id)
+        if entry.get("status")=="COMPLETE": return {**entry,"reused":True,"must_not_repeat":True}
+        entry.update({"status":"PENDING","attempts":int(entry.get("attempts",1))+1,"reconciliation":dict(reconciliation),"updated_at":utc_now()}); self._save(index); append_jsonl(self.paths.action_log,{"event":"RETRY","at":utc_now(),**entry}); MetricsRecorder(self.paths).record("action_retry",1,{"provider":entry.get("provider") or "unknown","action":entry["action"]}); return entry
+
+    def get(self,operation_id:str)->dict[str,Any]:
+        entry=self._load().get("operations",{}).get(operation_id)
+        if not entry: raise KeyError(operation_id)
+        return entry
+
+
+def percentile(values: Sequence[float], pct: float) -> float | None:
+    if not values: return None
+    ordered=sorted(float(v) for v in values)
+    if len(ordered)==1: return ordered[0]
+    idx=(len(ordered)-1)*pct; lo=int(idx); hi=min(lo+1,len(ordered)-1); frac=idx-lo
+    return ordered[lo]*(1-frac)+ordered[hi]*frac
+
+
+class RuntimeHealth:
+    def __init__(self, paths: RuntimePaths, slo: Mapping[str, Any] | None = None) -> None: self.paths,self.slo=paths,dict(slo or {})
+    def report(self)->dict[str,Any]:
+        metrics=MetricsRecorder(self.paths).read(); by_name:dict[str,list[float]]={}
+        for e in metrics: by_name.setdefault(e["name"],[]).append(float(e.get("value",0)))
+        success=sum(by_name.get("action_completed",[])); fail=sum(by_name.get("action_failed",[])); total=success+fail; retry=sum(by_name.get("action_retry",[])); ra=sum(by_name.get("resume_attempted",[])); rs=sum(by_name.get("resume_succeeded",[]))
+        outcomes={s:0 for s in FINAL_STATUSES}
+        if self.paths.runs.exists():
+            for p in self.paths.runs.glob("*.json"):
+                st=read_json(p,{}).get("status")
+                if st in outcomes: outcomes[st]+=1
+        receipts=list(self.paths.receipts.glob("*.json")) if self.paths.receipts.exists() else []; required={"schema","receipt_id","run_id","status","objective_sha256","runtime","capability_snapshot_sha256","action_journal_sha256","continuation","created_at"}; complete=sum(1 for p in receipts if required.issubset(read_json(p,{}).keys()))
+        latency_names=("boot_latency_ms","state_recovery_latency_ms","composition_latency_ms","capability_probe_latency_ms")
+        report={"schema":"glaciereq.runtime-health.v2","at":utc_now(),"latencies_ms":{n:{"p50":percentile(by_name.get(n,[]),.5),"p95":percentile(by_name.get(n,[]),.95),"count":len(by_name.get(n,[]))} for n in latency_names},"tool_success_rate":success/total if total else None,"retry_rate":retry/total if total else None,"stale_projection_events":int(sum(by_name.get("stale_projection_event",[]))),"receipt_completeness":complete/len(receipts) if receipts else None,"resume_success_rate":rs/ra if ra else None,"verification_failures":int(sum(by_name.get("verification_failure",[]))),"run_outcomes":outcomes,"capability_snapshot":CapabilityPlane(self.paths).snapshot(),"governor":ResourceGovernor(self.paths).snapshot()}
+        report["slo_evaluation"]=self._evaluate(report); return report
+    def _evaluate(self,report:Mapping[str,Any])->dict[str,Any]:
+        t=self.slo.get("thresholds",{}); checks=[]
+        def add(name,actual,op,expected,passed): checks.append({"name":name,"actual":actual,"operator":op,"expected":expected,"passed":passed})
+        for key,field,op in (("tool_success_rate_min","tool_success_rate",">="),("retry_rate_max","retry_rate","<="),("receipt_completeness_min","receipt_completeness",">="),("resume_success_rate_min","resume_success_rate",">=")):
+            if key in t:
+                a=report.get(field); e=float(t[key]); add(field,a,op,e,None if a is None else (a>=e if op==">=" else a<=e))
+        for metric,key in (("boot_latency_ms","boot_latency_p95_ms_max"),("state_recovery_latency_ms","state_recovery_latency_p95_ms_max"),("composition_latency_ms","composition_latency_p95_ms_max")):
+            if key in t:
+                a=report.get("latencies_ms",{}).get(metric,{}).get("p95"); e=float(t[key]); add(metric+".p95",a,"<=",e,None if a is None else a<=e)
+        failed=[c for c in checks if c["passed"] is False]; return {"status":"PASS" if not failed else "FAIL","checks":checks,"failed":[c["name"] for c in failed]}
+
+
+class ReceiptManager:
+    def __init__(self, paths:RuntimePaths, *, contract_dir:Path|str, canonical_commit:str|None=None, compiler_path:Path|str|None=None)->None:
+        self.paths=paths; self.contract_dir=Path(contract_dir); self.canonical_commit=canonical_commit or os.getenv("APEX_RUNTIME_CANONICAL_COMMIT","UNPINNED"); self.compiler_path=Path(compiler_path) if compiler_path else Path(__file__)
+    def contract_hashes(self)->dict[str,str]: return {p.name:sha256_file(p) for p in sorted(self.contract_dir.glob("*.json")) if p.is_file()}
+    def action_journal_hash(self)->str: return sha256_json(read_json(self.paths.action_index,{"schema":"glaciereq.action-index.v2","operations":{}}))
+    def create(self,run_id:str,*,status:str,activation_path:Path|str|None=None,skills:Sequence[Mapping[str,Any]]|None=None,source_predicates:Sequence[Mapping[str,Any]]|None=None,blockers:Sequence[Mapping[str,Any]|str]|None=None,continuation:Mapping[str,Any]|None=None)->dict[str,Any]:
+        if status not in FINAL_STATUSES: raise ValueError(f"invalid receipt status: {status}")
+        run=LifecycleEngine(self.paths).load(run_id); snapshot=CapabilityPlane(self.paths).snapshot(); skill_records=[]
+        for skill in skills or []:
+            item=dict(skill); path=item.get("path")
+            if path and Path(path).is_file(): item["sha256"]=sha256_file(path)
+            skill_records.append(item)
+        activation=None
+        if activation_path:
+            p=Path(activation_path); activation={"path":str(p),"sha256":sha256_file(p) if p.is_file() else None,"exists":p.is_file()}
+        rid=uuid.uuid4().hex; receipt={"schema":RECEIPT_SCHEMA,"receipt_id":rid,"run_id":run_id,"status":status,"objective_sha256":run["objective_sha256"],"runtime":{"canonical_repository":"GlacierEQ/apex-boot-core","canonical_commit":self.canonical_commit,"compiler_path":str(self.compiler_path),"compiler_sha256":sha256_file(self.compiler_path),"contract_hashes":self.contract_hashes()},"activation":activation,"skills":skill_records,"capability_snapshot_sha256":sha256_json(snapshot),"capability_snapshot":snapshot,"action_journal_sha256":self.action_journal_hash(),"source_predicates":[dict(x) for x in (source_predicates or run.get("source_predicates",[]))],"blockers":[dict(x) if isinstance(x,Mapping) else {"blocker":str(x)} for x in (blockers or [])],"continuation":dict(continuation or {"current_stage":run.get("current_stage"),"completed_stages":run.get("completed_stages",[]),"outstanding_dependencies":run.get("outstanding_dependencies",[]),"cursor":run.get("continuation_cursor",{})}),"created_at":utc_now()}
+        path=self.paths.receipts/f"{rid}.json"; atomic_write_json(path,receipt); atomic_write_json(self.paths.last_receipt,receipt); append_jsonl(self.paths.receipt_index,{"receipt_id":rid,"run_id":run_id,"status":status,"path":str(path),"created_at":receipt["created_at"],"sha256":sha256_file(path)}); MetricsRecorder(self.paths).record("receipt_created",1,{"status":status}); return receipt
+    def replay(self,receipt_path:Path|str)->dict[str,Any]:
+        start=time.perf_counter(); path=Path(receipt_path); receipt=read_json(path)
+        if not receipt: raise FileNotFoundError(path)
+        checks=[]
+        def check(name,expected,actual): checks.append({"name":name,"expected":expected,"actual":actual,"passed":expected==actual})
+        runtime=receipt.get("runtime",{}); check("compiler_sha256",runtime.get("compiler_sha256"),sha256_file(self.compiler_path)); current=self.contract_hashes()
+        for name,expected in runtime.get("contract_hashes",{}).items(): check(f"contract:{name}",expected,current.get(name))
+        activation=receipt.get("activation")
+        if activation and activation.get("path"):
+            p=Path(activation["path"]); check("activation_sha256",activation.get("sha256"),sha256_file(p) if p.is_file() else None)
+        for skill in receipt.get("skills",[]):
+            p=Path(skill.get("path","")); check(f"skill:{skill.get('name')}",skill.get("sha256"),sha256_file(p) if p.is_file() else None)
+        for pred in receipt.get("source_predicates",[]): self._check_predicate(pred,checks)
+        run=read_json(self.paths.run(receipt.get("run_id")),{}); check("objective_sha256",receipt.get("objective_sha256"),run.get("objective_sha256"))
+        passed=all(c["passed"] for c in checks); duration=(time.perf_counter()-start)*1000; m=MetricsRecorder(self.paths); m.record("replay_latency_ms",duration,{"passed":passed})
+        if not passed: m.record("verification_failure",1,{"source":"replay"})
+        return {"schema":"glaciereq.runtime-attestation.v2","receipt":str(path),"status":"VERIFIED" if passed else "DRIFTED","checks":checks,"created_at":utc_now()}
+    @staticmethod
+    def _check_predicate(pred:Mapping[str,Any],checks:list[dict[str,Any]])->None:
+        kind=pred.get("type","file_sha256"); p=Path(str(pred.get("path","")))
+        if kind=="file_sha256": expected=pred.get("sha256"); actual=sha256_file(p) if p.is_file() else None
+        elif kind=="file_exists": expected=bool(pred.get("exists",True)); actual=p.exists()
+        else: checks.append({"name":f"predicate:{kind}","expected":"supported","actual":"unsupported","passed":False}); return
+        checks.append({"name":f"predicate:{kind}:{p}","expected":expected,"actual":actual,"passed":expected==actual})
+    def resume_from_receipt(self,receipt_path:Path|str)->dict[str,Any]:
+        receipt=read_json(Path(receipt_path))
+        if not receipt: raise FileNotFoundError(receipt_path)
+        attestation=self.replay(receipt_path)
+        if attestation["status"]!="VERIFIED": return {"resumable":False,"reason":"receipt_drift","attestation":attestation}
+        result=LifecycleEngine(self.paths).resume(receipt["run_id"]); return {"attestation":attestation,**result}
+
+
+def load_contracts(contract_dir:Path|str)->dict[str,Any]:
+    d=Path(contract_dir); return {p.name:read_json(p) for p in sorted(d.glob("*.json")) if p.is_file()}
+
+def validate_contracts(contract_dir:Path|str)->list[str]:
+    c=load_contracts(contract_dir); errors=[]; runtime=c.get("runtime_contract.json")
+    if not runtime: return ["missing runtime_contract.json"]
+    if runtime.get("capability_states") != list(CAPABILITY_STATES): errors.append("capability state contract drift")
+    if runtime.get("runtime_stages") != list(RUNTIME_STAGES): errors.append("runtime stage contract drift")
+    if runtime.get("fallback_contracts") != list(FALLBACK_CONTRACTS): errors.append("fallback contract drift")
+    if runtime.get("receipt_schema") != RECEIPT_SCHEMA: errors.append("receipt schema id drift")
+    return errors
+
+__all__=["ActionJournal","CAPABILITY_RANK","CAPABILITY_STATES","CIRCUIT_STATES","CapabilityPlane","CapabilityRecord","FALLBACK_CONTRACTS","FallbackGraph","FINAL_STATUSES","GovernorConfig","InvalidTransition","LifecycleEngine","MetricsRecorder","RECEIPT_SCHEMA","RUNTIME_STAGES","ReceiptManager","ResourceGovernor","RuntimeHealth","RuntimePaths","atomic_write_json","read_json","sha256_file","sha256_json","utc_now","validate_contracts"]
+<<<GLACIEREQ_FILE runtime/contracts/capability.schema.json 1292>>>
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glaciereq.local/schema/capability-record-v2.json",
+  "title": "GlacierEQ Capability Record v2",
+  "type": "object",
+  "required": [
+    "schema", "capability_id", "kind", "provider", "state", "discovered_at",
+    "state_changed_at", "ttl_seconds", "consecutive_failures", "total_failures",
+    "success_count", "circuit_state", "cooldown_seconds"
+  ],
+  "properties": {
+    "schema": {"const": "glaciereq.capability-record.v2"},
+    "capability_id": {"type": "string", "minLength": 1},
+    "kind": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "state": {"enum": ["DISCOVERED", "CONNECTED", "AUTHENTICATED", "AUTHORIZED", "INVOKABLE", "VERIFIED"]},
+    "ttl_seconds": {"type": "integer", "minimum": 0},
+    "latency_ms": {"type": ["number", "null"], "minimum": 0},
+    "consecutive_failures": {"type": "integer", "minimum": 0},
+    "total_failures": {"type": "integer", "minimum": 0},
+    "success_count": {"type": "integer", "minimum": 0},
+    "circuit_state": {"enum": ["CLOSED", "OPEN", "HALF_OPEN"]},
+    "cooldown_seconds": {"type": "integer", "minimum": 0},
+    "authorization_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}
+<<<GLACIEREQ_FILE runtime/contracts/capability_inventory.schema.json 1528>>>
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glaciereq.local/schema/capability-inventory-v2.json",
+  "title": "GlacierEQ Capability Inventory v2",
+  "type": "object",
+  "required": ["schema", "capabilities"],
+  "properties": {
+    "schema": {"const": "glaciereq.capability-inventory.v2"},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capability_id", "kind", "provider"],
+        "properties": {
+          "capability_id": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["connector", "tool", "model", "skill", "runtime", "memory", "service"]},
+          "provider": {"type": "string", "minLength": 1},
+          "ttl_seconds": {"type": "integer", "minimum": 0},
+          "authorization_scopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "endpoint_ref": {"type": ["string", "null"]},
+          "metadata": {"type": "object"},
+          "probe": {
+            "type": "object",
+            "properties": {
+              "connected": {"type": "boolean"},
+              "authenticated": {"type": "boolean"},
+              "authorized": {"type": "boolean"},
+              "invokable": {"type": "boolean"},
+              "verified": {"type": "boolean"},
+              "latency_ms": {"type": ["number", "null"], "minimum": 0},
+              "error": {"type": ["string", "null"]},
+              "metadata": {"type": "object"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+<<<GLACIEREQ_FILE runtime/contracts/receipt.schema.json 1224>>>
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glaciereq.local/schema/runtime-receipt-v2.json",
+  "title": "GlacierEQ Runtime Receipt v2",
+  "type": "object",
+  "required": [
+    "schema", "receipt_id", "run_id", "status", "objective_sha256", "runtime",
+    "capability_snapshot_sha256", "capability_snapshot", "action_journal_sha256",
+    "action_journal_snapshot", "attestation_payload_sha256",
+    "source_predicates", "blockers", "continuation", "created_at"
+  ],
+  "properties": {
+    "schema": {"const": "glaciereq.runtime-receipt.v2"},
+    "status": {"enum": ["READY", "DEGRADED", "BLOCKED", "FAILED"]},
+    "runtime": {
+      "type": "object",
+      "required": ["canonical_repository", "canonical_commit", "compiler_sha256", "contract_hashes"]
+    },
+    "continuation": {
+      "type": "object",
+      "required": ["current_stage", "completed_stages", "outstanding_dependencies", "cursor"]
+    }
+  }
+}
+<<<GLACIEREQ_FILE runtime/contracts/fallback_graph.json 570>>>
+{
+  "schema": "glaciereq.fallback-graph.v2",
+  "contracts": {
+    "equivalent": "Preserves required read/write, durability, authority, and verification semantics.",
+    "degraded": "Can continue the mission with explicitly reduced semantics recorded in the receipt.",
+    "read_only": "May satisfy reads but is forbidden for mutations.",
+    "non_persistent": "May execute transiently but cannot satisfy durability requirements.",
+    "forbidden": "Must never be selected as fallback for this edge."
+  },
+  "edges": []
+}
+<<<GLACIEREQ_FILE runtime/contracts/governor_defaults.json 355>>>
+{
+  "schema": "glaciereq.resource-governor-config.v2",
+  "worker_slots": 8,
+  "connector_concurrency": 4,
+  "provider_concurrency": {
+    "github": 2,
+    "memory": 3,
+    "model": 4
+  },
+  "token_budget": 200000,
+  "context_budget": 200000,
+  "retry_limit": 3,
+  
