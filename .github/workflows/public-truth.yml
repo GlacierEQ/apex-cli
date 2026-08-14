@@ -23,7 +23,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-
       - name: Verify exact source identity
         shell: bash
         run: |
@@ -33,20 +32,14 @@ jobs:
             git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}"
             git merge-base --is-ancestor "${{ github.event.pull_request.base.sha }}" HEAD
           fi
-
       - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
+        with: {python-version: "${{ matrix.python-version }}"}
       - name: Install public proof dependency
         run: python -m pip install --upgrade pytest
-
       - name: Compile repository-local Python surfaces
         run: python -m compileall -q core tests bundle/scripts/verify_mem0_layers.py bundle/scripts/dynamic_skill_activator.py
-
       - name: Run bounded public-surface tests
         run: python -m pytest -q tests/test_public_surface.py
-
       - name: Verify shell entrypoint syntax and behavior
         run: |
           bash -n apex install.sh apex-auto-start bundle/config/startup.sh
@@ -59,25 +52,21 @@ jobs:
         shell: bash
         run: |
           runtime_home="$(mktemp -d)"
+          echo "APEX_TEST_HOME=$runtime_home" >> "$GITHUB_ENV"
           export HOME="$runtime_home"
           bash ./install.sh >/tmp/apex-install.txt
           apex="$runtime_home/bin/apex"
           commit="84a2907a316327e91dc0426f5407a34908aa4fc4"
-
           test -f "$runtime_home/.apex/runtime_projection/RUNTIME_PROJECTION.json"
           test -f "$runtime_home/.apex/runtime_projection/runtime/hardening.py"
           test -f "$runtime_home/.apex/last_runtime_receipt.json"
           python "$runtime_home/.apex/runtime_projection/scripts/verify_runtime_projection.py" --root "$runtime_home/.apex/runtime_projection" --expect-commit "$commit" >/tmp/projection-proof.json
-
           "$apex" runtime-status >/tmp/runtime-status.json
           "$apex" replay "$runtime_home/.apex/last_runtime_receipt.json" >/tmp/replay.json
           python - "$runtime_home/.apex/last_runtime_receipt.json" /tmp/runtime-status.json /tmp/replay.json "$commit" <<'PY'
           import json,sys
           from pathlib import Path
-          receipt=json.loads(Path(sys.argv[1]).read_text())
-          status=json.loads(Path(sys.argv[2]).read_text())
-          replay=json.loads(Path(sys.argv[3]).read_text())
-          commit=sys.argv[4]
+          receipt=json.loads(Path(sys.argv[1]).read_text()); status=json.loads(Path(sys.argv[2]).read_text()); replay=json.loads(Path(sys.argv[3]).read_text()); commit=sys.argv[4]
           assert receipt["schema"] == "glaciereq.runtime-receipt.v2", receipt
           assert receipt["status"] == "READY", receipt
           assert receipt["runtime"]["canonical_repository"] == "GlacierEQ/apex-boot-core", receipt
@@ -92,7 +81,7 @@ jobs:
       - name: Prove capability freshness and inventory truth
         shell: bash
         run: |
-          apex="$HOME/bin/apex"
+          export HOME="$APEX_TEST_HOME"; apex="$HOME/bin/apex"
           cat > /tmp/inventory.json <<'JSON'
           {"schema":"glaciereq.capability-inventory.v2","capabilities":[
             {"capability_id":"connector.unprobed","kind":"connector","provider":"demo","ttl_seconds":900},
@@ -118,12 +107,11 @@ jobs:
       - name: Prove resume and idempotent side effects
         shell: bash
         run: |
-          apex="$HOME/bin/apex"
+          export HOME="$APEX_TEST_HOME"; apex="$HOME/bin/apex"
           "$apex" runtimectl start "resume proof" --run-id resume-proof >/dev/null
           "$apex" runtimectl advance resume-proof >/dev/null
           "$apex" runtimectl checkpoint resume-proof --cursor-json '{"stage":"CAPABILITY_PROBE","action_index":7}' --dependencies-json '["connector.github"]' >/dev/null
           "$apex" resume resume-proof >/tmp/resume.json
-
           "$apex" runtimectl action-begin resume-proof merge repo#8 merge-proof --precondition-hash before --compensation-pointer revert#8 >/tmp/action1.json
           op="$(python -c 'import json;print(json.load(open("/tmp/action1.json"))["operation_id"])')"
           "$apex" runtimectl action-complete "$op" --result-json '{"merged":true}' --readback-json '{"state":"merged"}' --postcondition-hash after >/dev/null
@@ -131,8 +119,7 @@ jobs:
           python - /tmp/resume.json /tmp/action2.json <<'PY'
           import json,sys
           from pathlib import Path
-          resume=json.loads(Path(sys.argv[1]).read_text())
-          action=json.loads(Path(sys.argv[2]).read_text())
+          resume=json.loads(Path(sys.argv[1]).read_text()); action=json.loads(Path(sys.argv[2]).read_text())
           assert resume["resumable"] is True, resume
           assert resume["next_stage"] == "CAPABILITY_PROBE", resume
           assert resume["cursor"]["action_index"] == 7, resume
@@ -143,7 +130,7 @@ jobs:
       - name: Prove governor economics and runtime health
         shell: bash
         run: |
-          apex="$HOME/bin/apex"
+          export HOME="$APEX_TEST_HOME"; apex="$HOME/bin/apex"
           cat > /tmp/governor.json <<'JSON'
           {"worker_slots":1,"connector_concurrency":1,"provider_concurrency":{"model":1},"token_budget":100,"context_budget":10,"retry_limit":2,"deadline_seconds":3600}
           JSON
@@ -154,9 +141,7 @@ jobs:
           python - /tmp/context-denial.json /tmp/quota-denial.json /tmp/health.json <<'PY'
           import json,sys
           from pathlib import Path
-          context=json.loads(Path(sys.argv[1]).read_text())
-          quota=json.loads(Path(sys.argv[2]).read_text())
-          health=json.loads(Path(sys.argv[3]).read_text())
+          context=json.loads(Path(sys.argv[1]).read_text()); quota=json.loads(Path(sys.argv[2]).read_text()); health=json.loads(Path(sys.argv[3]).read_text())
           assert context["admitted"] is False and context["reason"] == "context_budget", context
           assert quota["admitted"] is False and quota["reason"] == "provider_quota", quota
           assert health["schema"] == "glaciereq.runtime-health.v2", health
