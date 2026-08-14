@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,16 +42,39 @@ jobs:
         run: python -m pip install --upgrade pytest
 
       - name: Compile repository-local Python surfaces
-        run: python -m compileall -q core tests bundle/scripts/verify_mem0_layers.py
+        run: python -m compileall -q core tests bundle/scripts/verify_mem0_layers.py bundle/scripts/dynamic_skill_activator.py
 
       - name: Run bounded public-surface tests
         run: python -m pytest -q tests/test_public_surface.py
 
       - name: Verify shell entrypoint syntax and behavior
         run: |
-          bash -n apex
+          bash -n apex install.sh apex-auto-start bundle/config/startup.sh
           ./apex help >/tmp/apex-help.txt
           grep -q 'External job-app commands fail closed' /tmp/apex-help.txt
+
+      - name: Prove fresh-install nervous-system runtime
+        shell: bash
+        run: |
+          runtime_home="$(mktemp -d)"
+          HOME="$runtime_home" bash ./install.sh >/tmp/apex-install.txt
+          test -f "$runtime_home/.apex/MASTERSKILL_ACTIVATION.json"
+          test -x "$runtime_home/.apex/startup.sh"
+          test -f "$runtime_home/.agents/skills/glaciereq-nervous-system/SKILL.md"
+          test -f "$runtime_home/.agents/skills/apex-aspen-grove-bootup/SKILL.md"
+          test -f "$runtime_home/.agents/skills/verification/SKILL.md"
+          test -f "$runtime_home/.apex/last_runtime_receipt.json"
+          HOME="$runtime_home" "$runtime_home/bin/apex" runtime-status >/tmp/apex-runtime-status.json
+          python - "$runtime_home/.apex/last_runtime_receipt.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert receipt["status"] == "READY", receipt
+          assert receipt["masterskill"] == "glaciereq-nervous-system", receipt
+          assert receipt["skills"][0]["name"] == "glaciereq-nervous-system", receipt
+          assert not receipt["missing_skills"], receipt
+          PY
 
       - name: Verify public boundary
         run: |
