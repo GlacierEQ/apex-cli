@@ -1,0 +1,25 @@
+{
+  "schema": "glaciereq.canonical-runtime-semantics.v1",
+  "canonical_repository": "GlacierEQ/apex-boot-core",
+  "canonical_commit": "84a2907a316327e91dc0426f5407a34908aa4fc4",
+  "parts": [
+    {"name": "canonical_part_00.txt", "git_blob_sha1": "66c4c74e04002b3554eb85f0a312b6d027888b9b"},
+    {"name": "canonical_part_01.txt", "git_blob_sha1": "d61cfc1d6e136385a91ceaf9e9afe5f19be522d8"},
+    {"name": "canonical_part_02.txt", "git_blob_sha1": "428b709ee1cda2903f235c0e68a71f88df80615b"},
+    {"name": "canonical_part_03.txt", "git_blob_sha1": "18b3d96e2b7c062463cdf8a2e3462e5456cf669c"},
+    {"name": "canonical_part_04.txt", "git_blob_sha1": "877628d3082f1353424188fe9dedbdf4f88aae91"}
+  ],
+  "files": {
+    "runtime/compiler.py": "eb4a94f873d8d545087effd05fe18eb1373a70390f67605d967ed1cbced48409",
+    "runtime/hardening.py": "59b1714fb39bd8d1a9f402e50c3a9a0f58c6da83f902033020778e31672a322d",
+    "runtime/contracts/runtime_contract.json": "9c22633f101577e5fedb0287abd4daeb9bb659ad52372da48d2f56d3cbbf801e",
+    "runtime/contracts/capability.schema.json": "0d727ba2d4f46c7ca4cf14fd03ba7c4e5e69de82ba6d161bffb95e5d78077930",
+    "runtime/contracts/capability_inventory.schema.json": "6c7592dc8c770eb00595fbf4255b2aa39dbf59f610db989320f3146425c3c84d",
+    "runtime/contracts/receipt.schema.json": "82cc37c0f2e226be44d0ae71c7d421266a5ace6113b3bea759c4ae1510bdd96f",
+    "runtime/contracts/fallback_graph.json": "0b6e0dde50626389ed33016568d1aa9c35a71cac9593a263605229bc834bc8cc",
+    "runtime/contracts/governor_defaults.json": "84e1a4e718f3416b2c9a97143c2d133181fc87833f7bfba2be15559a1a301dcf",
+    "runtime/contracts/slo.json": "7710eaea0292710e989ce1b58839e9beeaea9ae210726d7e0bdf1b8602a8c803",
+    "runtime/contracts/projection.schema.json": "2ede5d920d5d61f5957692f995497d4972138e77bdf1ed828a7348725d613cbc"
+  },
+  "law": "Semantics are exact bytes from the pinned private authority. Public CLI and verification mechanics are adapters and may not redefine these contracts."
+}
