@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Portable GlacierEQ nervous-system runtime composer.
+"""Portable GlacierEQ nervous-system composition adapter.
 
-This is the apex-cli host adapter for the canonical composition lifecycle. It
-resolves the baseline plus relevant installed specialists, verifies the local
-masterskill projection pin, and emits immutable replayable receipts.
+This host adapter selects the baseline plus relevant installed specialist skills
+and emits composition evidence. Canonical runtime lifecycle, capability,
+idempotency, replay, governor, and SLO semantics are owned by Apex Boot Core.
 """
 from __future__ import annotations
 
@@ -22,12 +22,12 @@ ACTIVATION_PATH = Path(os.getenv("GLACIEREQ_MASTERSKILL_ACTIVATION", str(APEX / 
 STARTUP_STATE_PATH = APEX / "STARTUP_STATE.json"
 MANIFEST_PATH = HOME / "SKILLS_MANIFEST.json"
 LIVE_CONTEXT_PATH = HOME / ".supermemory" / "ops" / "live-context.md"
-LATEST_RECEIPT_PATH = APEX / "last_runtime_receipt.json"
-RECEIPT_DIR = APEX / "runtime_receipts"
+LATEST_RECEIPT_PATH = APEX / "last_composition_receipt.json"
+RECEIPT_DIR = APEX / "composition_receipts"
 LEDGER_PATH = RECEIPT_DIR / "index.jsonl"
 
 MASTERSKILL = "glaciereq-nervous-system"
-COMPILER_ID = "glaciereq.runtime-composer.portable.v2"
+COMPILER_ID = "glaciereq.composition-adapter.portable.v3"
 LIFECYCLE = ["DISCOVER", "MAP", "REUSE", "EXTEND", "EXECUTE", "VERIFY", "PERSIST"]
 BASELINE = [MASTERSKILL, "apex-aspen-grove-bootup", "verification"]
 SKILL_ROOTS = [
@@ -143,7 +143,7 @@ def write_live_context(activation: dict[str, Any], skills: list[dict[str, Any]])
         "# APEX PRIMED LIVE CONTEXT",
         f"Updated: {now()}",
         f"Masterskill: `{MASTERSKILL}`",
-        f"Canonical commit: `{activation.get('canonical_commit', 'UNKNOWN')}`",
+        f"Canonical masterskill commit: `{activation.get('canonical_commit', 'UNKNOWN')}`",
         f"Lifecycle: `{' -> '.join(LIFECYCLE)}`",
         "",
         "## Resolved skills",
@@ -174,7 +174,7 @@ def persist(receipt: dict[str, Any]) -> Path:
 
 def main() -> int:
     if not HOME:
-        print("APEX runtime failed: HOME unavailable", file=sys.stderr)
+        print("APEX composition failed: HOME unavailable", file=sys.stderr)
         return 78
     prompt = " ".join(sys.argv[1:]).strip() or "session"
     activation = load_json(ACTIVATION_PATH)
@@ -184,7 +184,7 @@ def main() -> int:
 
     masterskill = skills[0]
     if not masterskill["found"]:
-        print(f"APEX runtime failed: required masterskill {MASTERSKILL} not installed", file=sys.stderr)
+        print(f"APEX composition failed: required masterskill {MASTERSKILL} not installed", file=sys.stderr)
         return 2
 
     blockers = activation_blockers(activation)
@@ -200,13 +200,13 @@ def main() -> int:
     compiler_path = Path(__file__).resolve()
     receipt_id = f"{stamp.replace(':', '').replace('+', '_').replace('.', '-')}-{prompt_hash[:12]}"
     receipt = {
-        "schema": "glaciereq.runtime-composition-receipt.v2",
+        "schema": "glaciereq.composition-receipt.v3",
         "receipt_id": receipt_id,
         "at": stamp,
         "status": "READY" if not blockers else "DEGRADED",
         "blockers": blockers,
         "masterskill": MASTERSKILL,
-        "compiler": {"id": COMPILER_ID, "path": str(compiler_path), "sha256": file_hash(compiler_path)},
+        "adapter": {"id": COMPILER_ID, "path": str(compiler_path), "sha256": file_hash(compiler_path)},
         "activation": {
             "path": str(ACTIVATION_PATH),
             "sha256": file_hash(ACTIVATION_PATH) if ACTIVATION_PATH.is_file() else None,
@@ -221,7 +221,7 @@ def main() -> int:
         "skills": [{k: skill[k] for k in ("name", "found", "path", "sha256")} for skill in skills],
         "missing_skills": [skill["name"] for skill in skills if not skill["found"]],
         "skill_roots": [str(root) for root in SKILL_ROOTS],
-        "continuation": "Read this immutable receipt, then current startup state and live context before rediscovery.",
+        "continuation": "Read this composition receipt together with the canonical runtime receipt before rediscovery.",
     }
     immutable = persist(receipt)
 
@@ -229,12 +229,12 @@ def main() -> int:
         state = load_json(STARTUP_STATE_PATH)
         state.setdefault("skills", {})["canonical_entrypoint"] = MASTERSKILL
         state["skills"]["active"] = selected
-        state["last_runtime_receipt"] = str(LATEST_RECEIPT_PATH)
+        state["last_composition_receipt"] = str(LATEST_RECEIPT_PATH)
         STARTUP_STATE_PATH.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
     print(f"APEX NERVOUS-SYSTEM COMPOSITION: {receipt['status']}")
-    print(f"Immutable receipt: {immutable}")
-    print(f"Latest receipt: {LATEST_RECEIPT_PATH}")
+    print(f"Immutable composition receipt: {immutable}")
+    print(f"Latest composition receipt: {LATEST_RECEIPT_PATH}")
     if blockers:
         for blocker in blockers:
             print(f"BLOCKER: {blocker}")
