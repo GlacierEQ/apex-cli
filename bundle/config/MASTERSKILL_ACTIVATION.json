@@ -1,0 +1,10 @@
+{
+  "schema": "glaciereq.masterskill-activation.v1",
+  "status": "ACTIVE_PROJECTION",
+  "name": "glaciereq-nervous-system",
+  "canonical_source": "GlacierEQ/antigravity-awesome-skills/skills/glaciereq-nervous-system/SKILL.md",
+  "canonical_commit": "6e3bcf71e8d79c682dbe8993a012b761d0a19390",
+  "lifecycle": ["DISCOVER", "MAP", "REUSE", "EXTEND", "EXECUTE", "VERIFY", "PERSIST"],
+  "boot_delegate": "GlacierEQ/apex-boot-core",
+  "technology_delegate": "GlacierEQ/the-tower-of-babel"
+}
