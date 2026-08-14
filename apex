@@ -19,6 +19,13 @@ exec_local_or_bin() {
     exit 78
 }
 
+require_home() {
+    if [[ -z "$HOME_DIR" ]]; then
+        echo "APEX runtime unavailable: HOME is unset" >&2
+        exit 78
+    fi
+}
+
 require_job_app_file() {
     local relative_path="$1"
     if [[ -z "$JOB_APP_DIR" ]]; then
@@ -38,6 +45,47 @@ SUBCOMMAND="${1:-help}"
 shift || true
 
 case "$SUBCOMMAND" in
+    boot|start)
+        require_home
+        startup="$HOME_DIR/.apex/startup.sh"
+        if [[ ! -x "$startup" ]]; then
+            echo "APEX runtime unavailable: $startup is missing or not executable" >&2
+            exit 78
+        fi
+        exec "$startup" "$@"
+        ;;
+    compose|runtime)
+        require_home
+        activator="$HOME_DIR/scripts/dynamic_skill_activator.py"
+        if [[ ! -f "$activator" ]]; then
+            echo "APEX runtime unavailable: $activator is missing" >&2
+            exit 78
+        fi
+        exec python3 "$activator" "${*:-session}"
+        ;;
+    runtime-status)
+        require_home
+        receipt="$HOME_DIR/.apex/last_runtime_receipt.json"
+        if [[ ! -f "$receipt" ]]; then
+            echo "APEX runtime receipt unavailable: $receipt" >&2
+            exit 78
+        fi
+        exec python3 - "$receipt" <<'PY'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+print(json.dumps({
+    "status": data.get("status"),
+    "masterskill": data.get("masterskill"),
+    "at": data.get("at"),
+    "skills": data.get("skills", []),
+    "missing_skills": data.get("missing_skills", []),
+    "receipt": str(path),
+}, indent=2))
+PY
+        ;;
     openclaw|claw)
         exec_local_or_bin apex-openclaw "$@"
         ;;
@@ -67,16 +115,21 @@ case "$SUBCOMMAND" in
 === APEX CLI ===
 Usage: apex <command> [args]
 
+Nervous-system runtime:
+  apex boot [objective]             Boot, compose, verify, and emit a runtime receipt
+  apex compose [objective]          Recompute the current skill composition
+  apex runtime-status               Read the latest composition receipt
+
 Repository-local commands:
-  apex openclaw [action] [target]  Run the apex-openclaw command if installed here or in ~/bin
-  apex daemon                      Run the apex-daemon command if installed here or in ~/bin
+  apex openclaw [action] [target]   Run the apex-openclaw command if installed here or in ~/bin
+  apex daemon                       Run the apex-daemon command if installed here or in ~/bin
 
 Explicit external job-app commands:
-  apex highway                     Run apex_highway.py from APEX_JOB_APP_DIR
-  apex hero                        Run demo_heroes.sh from APEX_JOB_APP_DIR
-  apex status                      Run highway + governance scripts from APEX_JOB_APP_DIR
+  apex highway                      Run apex_highway.py from APEX_JOB_APP_DIR
+  apex hero                         Run demo_heroes.sh from APEX_JOB_APP_DIR
+  apex status                       Run highway + governance scripts from APEX_JOB_APP_DIR
 
-External job-app commands fail closed with exit 78 when their files are absent.
+External dependencies fail closed with exit 78 when their required files are absent.
 EOF
         ;;
     *)
