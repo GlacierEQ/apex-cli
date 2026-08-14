@@ -1,0 +1,366 @@
+<<<GLACIEREQ_FILE runtime/compiler.py 42327>>>
+#!/usr/bin/env python3
+"""Canonical GlacierEQ runtime kernel.
+
+Owns live capability state, resumable lifecycle state, idempotent side-effect
+journaling, resource governance, fallback selection, replay/attestation, and
+runtime health metrics. Host adapters may discover tools differently, but they
+must not redefine these semantics.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import time
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+CAPABILITY_STATES = (
+    "DISCOVERED", "CONNECTED", "AUTHENTICATED", "AUTHORIZED", "INVOKABLE", "VERIFIED",
+)
+CAPABILITY_RANK = {name: idx for idx, name in enumerate(CAPABILITY_STATES)}
+CIRCUIT_STATES = ("CLOSED", "OPEN", "HALF_OPEN")
+RUNTIME_STAGES = (
+    "BOOT", "CAPABILITY_PROBE", "DISCOVER", "MAP", "REUSE", "EXTEND",
+    "CHECKPOINT", "EXECUTE", "VERIFY", "PERSIST",
+)
+FINAL_STATUSES = ("READY", "DEGRADED", "BLOCKED", "FAILED")
+FALLBACK_CONTRACTS = ("equivalent", "degraded", "read_only", "non_persistent", "forbidden")
+RECEIPT_SCHEMA = "glaciereq.runtime-receipt.v2"
+RUN_SCHEMA = "glaciereq.runtime-run.v2"
+CAPABILITY_SCHEMA = "glaciereq.capability-record.v2"
+
+
+class RuntimeErrorBase(RuntimeError):
+    pass
+
+
+class InvalidTransition(RuntimeErrorBase):
+    pass
+
+
+class ResourceDenied(RuntimeErrorBase):
+    def __init__(self, decision: Mapping[str, Any]):
+        self.decision = dict(decision)
+        super().__init__(self.decision.get("reason", "resource denied"))
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def parse_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_json(value: Any) -> str:
+    return sha256_bytes(canonical_json_bytes(value))
+
+
+def sha256_file(path: Path | str) -> str:
+    path = Path(path)
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def atomic_write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".tmp-{os.getpid()}-{uuid.uuid4().hex}")
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def read_json(path: Path, default: Any = None) -> Any:
+    if not path.exists():
+        return default
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def append_jsonl(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(dict(value), sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+@dataclass
+class RuntimePaths:
+    root: Path
+
+    def __post_init__(self) -> None:
+        self.root = Path(self.root)
+
+    @property
+    def capabilities(self) -> Path:
+        return self.root / "capabilities.json"
+
+    @property
+    def capability_history(self) -> Path:
+        return self.root / "capability_history.jsonl"
+
+    @property
+    def runs(self) -> Path:
+        return self.root / "runs"
+
+    @property
+    def actions(self) -> Path:
+        return self.root / "actions"
+
+    @property
+    def action_index(self) -> Path:
+        return self.actions / "index.json"
+
+    @property
+    def action_log(self) -> Path:
+        return self.actions / "journal.jsonl"
+
+    @property
+    def receipts(self) -> Path:
+        return self.root / "runtime_receipts"
+
+    @property
+    def receipt_index(self) -> Path:
+        return self.receipts / "index.jsonl"
+
+    @property
+    def last_receipt(self) -> Path:
+        return self.root / "last_runtime_receipt.json"
+
+    @property
+    def governor(self) -> Path:
+        return self.root / "governor.json"
+
+    @property
+    def metrics(self) -> Path:
+        return self.root / "runtime_metrics.jsonl"
+
+    def run(self, run_id: str) -> Path:
+        return self.runs / f"{run_id}.json"
+
+
+@dataclass
+class CapabilityRecord:
+    capability_id: str
+    kind: str
+    provider: str
+    state: str = "DISCOVERED"
+    discovered_at: str = field(default_factory=utc_now)
+    state_changed_at: str = field(default_factory=utc_now)
+    last_probe_at: str | None = None
+    verified_at: str | None = None
+    ttl_seconds: int = 900
+    latency_ms: float | None = None
+    consecutive_failures: int = 0
+    total_failures: int = 0
+    success_count: int = 0
+    circuit_state: str = "CLOSED"
+    circuit_opened_at: str | None = None
+    cooldown_seconds: int = 60
+    authorization_scopes: list[str] = field(default_factory=list)
+    endpoint_ref: str | None = None
+    last_error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def validate(self) -> None:
+        if self.state not in CAPABILITY_STATES:
+            raise ValueError(f"invalid capability state: {self.state}")
+        if self.circuit_state not in CIRCUIT_STATES:
+            raise ValueError(f"invalid circuit state: {self.circuit_state}")
+        if self.ttl_seconds < 0 or self.cooldown_seconds < 0:
+            raise ValueError("TTL and cooldown must be >= 0")
+
+    def fresh(self, now: datetime | None = None) -> bool:
+        now = now or datetime.now(timezone.utc)
+        anchor = parse_time(self.verified_at if self.state == "VERIFIED" else self.last_probe_at)
+        return bool(anchor and now <= anchor + timedelta(seconds=self.ttl_seconds))
+
+    def circuit_available(self, now: datetime | None = None) -> bool:
+        now = now or datetime.now(timezone.utc)
+        if self.circuit_state in ("CLOSED", "HALF_OPEN"):
+            return True
+        opened = parse_time(self.circuit_opened_at)
+        return bool(opened and now >= opened + timedelta(seconds=self.cooldown_seconds))
+
+    def effective_state(self, now: datetime | None = None) -> str:
+        if not self.fresh(now) or not self.circuit_available(now):
+            return "DISCOVERED"
+        return self.state
+
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        data = asdict(self)
+        data["schema"] = CAPABILITY_SCHEMA
+        data["fresh"] = self.fresh()
+        data["effective_state"] = self.effective_state()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "CapabilityRecord":
+        values = dict(data)
+        values.pop("schema", None)
+        values.pop("fresh", None)
+        values.pop("effective_state", None)
+        obj = cls(**values)
+        obj.validate()
+        return obj
+
+
+class MetricsRecorder:
+    def __init__(self, paths: RuntimePaths) -> None:
+        self.paths = paths
+
+    def record(self, name: str, value: float, labels: Mapping[str, Any] | None = None) -> None:
+        append_jsonl(self.paths.metrics, {"at": utc_now(), "name": name, "value": value, "labels": dict(labels or {})})
+
+    def read(self) -> list[dict[str, Any]]:
+        if not self.paths.metrics.exists():
+            return []
+        return [json.loads(line) for line in self.paths.metrics.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+class CapabilityPlane:
+    def __init__(self, paths: RuntimePaths, failure_threshold: int = 3, default_ttl_seconds: int = 900) -> None:
+        self.paths = paths
+        self.failure_threshold = max(1, int(failure_threshold))
+        self.default_ttl_seconds = max(0, int(default_ttl_seconds))
+
+    def _load(self) -> dict[str, CapabilityRecord]:
+        raw = read_json(self.paths.capabilities, {"schema": "glaciereq.capability-plane.v2", "capabilities": {}})
+        return {k: CapabilityRecord.from_dict(v) for k, v in raw.get("capabilities", {}).items()}
+
+    def _save(self, records: Mapping[str, CapabilityRecord]) -> None:
+        atomic_write_json(self.paths.capabilities, {
+            "schema": "glaciereq.capability-plane.v2",
+            "updated_at": utc_now(),
+            "capabilities": {k: v.to_dict() for k, v in sorted(records.items())},
+        })
+
+    def register(self, capability_id: str, kind: str, provider: str, *, ttl_seconds: int | None = None,
+                 authorization_scopes: Sequence[str] | None = None, endpoint_ref: str | None = None,
+                 metadata: Mapping[str, Any] | None = None) -> CapabilityRecord:
+        records = self._load()
+        record = records.get(capability_id)
+        if record:
+            record.kind, record.provider = kind, provider
+            if ttl_seconds is not None: record.ttl_seconds = int(ttl_seconds)
+            if authorization_scopes is not None: record.authorization_scopes = sorted(set(authorization_scopes))
+            if endpoint_ref is not None: record.endpoint_ref = endpoint_ref
+            if metadata: record.metadata.update(dict(metadata))
+        else:
+            record = CapabilityRecord(
+                capability_id=capability_id, kind=kind, provider=provider,
+                ttl_seconds=self.default_ttl_seconds if ttl_seconds is None else int(ttl_seconds),
+                authorization_scopes=sorted(set(authorization_scopes or [])), endpoint_ref=endpoint_ref,
+                metadata=dict(metadata or {}),
+            )
+        records[capability_id] = record
+        self._save(records)
+        append_jsonl(self.paths.capability_history, {"at": utc_now(), "event": "REGISTER", "capability_id": capability_id, "record": record.to_dict()})
+        return record
+
+    def get(self, capability_id: str) -> CapabilityRecord:
+        records = self._load()
+        if capability_id not in records: raise KeyError(capability_id)
+        record = records[capability_id]
+        if record.circuit_state == "OPEN" and record.circuit_available():
+            record.circuit_state = "HALF_OPEN"
+            records[capability_id] = record
+            self._save(records)
+        return record
+
+    @staticmethod
+    def _highest_state(checks: Mapping[str, bool]) -> str:
+        ordered = [("connected", "CONNECTED"), ("authenticated", "AUTHENTICATED"), ("authorized", "AUTHORIZED"), ("invokable", "INVOKABLE"), ("verified", "VERIFIED")]
+        state = "DISCOVERED"
+        for check_name, state_name in ordered:
+            if checks.get(check_name) is True: state = state_name
+            else: break
+        return state
+
+    def record_probe(self, capability_id: str, checks: Mapping[str, bool], *, latency_ms: float | None = None,
+                     error: str | None = None, metadata: Mapping[str, Any] | None = None) -> CapabilityRecord:
+        records = self._load()
+        if capability_id not in records: raise KeyError(capability_id)
+        record = records[capability_id]
+        now = utc_now()
+        new_state = self._highest_state(checks)
+        success = new_state == "VERIFIED"
+        if new_state != record.state:
+            record.state, record.state_changed_at = new_state, now
+        record.last_probe_at, record.latency_ms = now, latency_ms
+        if metadata: record.metadata.update(dict(metadata))
+        if success:
+            record.verified_at = now
+            record.success_count += 1
+            record.consecutive_failures = 0
+            record.last_error = None
+            record.circuit_state, record.circuit_opened_at = "CLOSED", None
+        else:
+            record.consecutive_failures += 1
+            record.total_failures += 1
+            record.last_error = error or f"probe stopped at {new_state}"
+            if record.consecutive_failures >= self.failure_threshold:
+                record.circuit_state, record.circuit_opened_at = "OPEN", now
+        records[capability_id] = record
+        self._save(records)
+        append_jsonl(self.paths.capability_history, {"at": now, "event": "PROBE", "capability_id": capability_id,
+            "checks": dict(checks), "latency_ms": latency_ms, "error": error, "result": record.to_dict()})
+        metrics = MetricsRecorder(self.paths)
+        metrics.record("capability_probe_latency_ms", float(latency_ms or 0), {"capability_id": capability_id})
+        metrics.record("capability_probe_success" if success else "capability_probe_failure", 1, {"capability_id": capability_id})
+        return record
+
+    def eligible(self, capability_id: str, *, minimum_state: str = "VERIFIED", required_scopes: Sequence[str] | None = None) -> bool:
+        if minimum_state not in CAPABILITY_RANK: raise ValueError(f"invalid minimum state: {minimum_state}")
+        record = self.get(capability_id)
+        scopes = set(required_scopes or [])
+        return record.fresh() and record.circuit_available() and CAPABILITY_RANK[record.effective_state()] >= CAPABILITY_RANK[minimum_state] and scopes.issubset(set(record.authorization_scopes))
+
+    def select(self, *, kind: str | None = None, provider: str | None = None, minimum_state: str = "VERIFIED",
+               required_scopes: Sequence[str] | None = None) -> list[CapabilityRecord]:
+        out = []
+        for record in self._load().values():
+            if kind and record.kind != kind: continue
+            if provider and record.provider != provider: continue
+            if self.eligible(record.capability_id, minimum_state=minimum_state, required_scopes=required_scopes): out.append(record)
+        return sorted(out, key=lambda item: (-CAPABILITY_RANK[item.effective_state()], item.latency_ms if item.latency_ms is not None else float("inf"), item.total_failures, item.capability_id))
+
+    def snapshot(self) -> dict[str, Any]:
+        records = self._load()
+        return {"schema": "glaciereq.capability-snapshot.v2", "at": utc_now(),
+            "capabilities": {k: v.to_dict() for k, v in sorted(records.items())},
+            "stale": [k for k, v in records.items() if not v.fresh()],
+            "open_circuits": [k for k, v in records.items() if v.circuit_state == "OPEN" and not v.circuit_available()]}
+
+
+class FallbackGraph:
+    def __init__(self, plane: CapabilityPlane, graph: Mapping[str, Any]) -> None:
+        self.plane, self.graph = plane, dict(graph)
+        for edge in self.graph.get("edges", []):
+            if edge.get("contract") not in FALLBACK_CONTRACTS: raise ValueError(f"invalid fallback contract: {edge.get('contract')}")
+
+    @classmethod
+    def from_path(cls, plane: CapabilityPlane, path: Path | str) -> "FallbackGraph":
+        return cls(plane, read_json(Path(path), {"edges": []}))
+
+    def choose(self, source_capability: str, *, action: str = "read", requires_persistence: bool = False,
+               minimum_state: str = "VERIFIED", allow_degraded: bool = True) -> dict[str, Any] | None:
+        candidates = [e for e in self.graph.get("edges", []) if e.get("f
