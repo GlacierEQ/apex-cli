@@ -50,12 +50,14 @@ parts=[]
 for item in meta['parts']:
     path=manifest_path.parent/item['name']; data=path.read_bytes()
     parts.append(data)
-bundle=b''.join(parts); expected=meta['files']; found={}; pos=0
+bundle=b''.join(parts); expected=meta['files']; found={}; seen=set(); pos=0
 prefix=b'<<<GLACIEREQ_FILE '
-while pos < len(bundle) and set(found)!=set(expected):
+while pos < len(bundle):
     if not bundle.startswith(prefix,pos): raise SystemExit(f'bad source boundary at {pos}')
     end=bundle.index(b'\n',pos); header=bundle[pos+len(prefix):end-3].decode('utf-8'); rel,size_s=header.rsplit(' ',1); size=int(size_s); start=end+1; payload=bundle[start:start+size]
     if len(payload)!=size: raise SystemExit(f'truncated source: {rel}')
+    if rel in seen: raise SystemExit(f'duplicate canonical source path: {rel}')
+    seen.add(rel)
     if rel in expected:
         actual=hashlib.sha256(payload).hexdigest()
         if actual!=expected[rel]: raise SystemExit(f'canonical checksum mismatch: {rel}')
