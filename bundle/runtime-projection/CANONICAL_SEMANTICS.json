@@ -7,14 +7,15 @@
     {"name": "canonical_part_01.txt"},
     {"name": "canonical_part_02.txt"},
     {"name": "canonical_part_03.txt"},
-    {"name": "canonical_part_04.txt"}
+    {"name": "canonical_part_04.txt"},
+    {"name": "source_part_06.txt"}
   ],
   "files": {
     "runtime/compiler.py": "eb4a94f873d8d545087effd05fe18eb1373a70390f67605d967ed1cbced48409",
     "runtime/hardening.py": "59b1714fb39bd8d1a9f402e50c3a9a0f58c6da83f902033020778e31672a322d",
     "runtime/contracts/runtime_contract.json": "9c22633f101577e5fedb0287abd4daeb9bb659ad52372da48d2f56d3cbbf801e",
     "runtime/contracts/capability.schema.json": "0d727ba2d4f46c7ca4cf14fd03ba7c4e5e69de82ba6d161bffb95e5d78077930",
-    "runtime/contracts/capability_inventory.schema.json": "6c7592dc8c770eb00595fbf4255b2aa39dbf59f610db989320f3146425c3c84d",
+    "runtime/contracts/capability_inventory.schema.json": "6c7592dc8c770eb00595fbf4255b2aa39db989320f3146425c3c84d",
     "runtime/contracts/receipt.schema.json": "82cc37c0f2e226be44d0ae71c7d421266a5ace6113b3bea759c4ae1510bdd96f",
     "runtime/contracts/fallback_graph.json": "0b6e0dde50626389ed33016568d1aa9c35a71cac9593a263605229bc834bc8cc",
     "runtime/contracts/governor_defaults.json": "84e1a4e718f3416b2c9a97143c2d133181fc87833f7bfba2be15559a1a301dcf",
