@@ -24,7 +24,11 @@ def j(value, default):
     if value is None:
         return default
     path = Path(value)
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else json.loads(value)
+    try:
+        is_file = path.is_file()
+    except OSError:
+        is_file = False
+    return json.loads(path.read_text(encoding="utf-8")) if is_file else json.loads(value)
 
 
 def parser():
@@ -79,7 +83,7 @@ def main():
     if cmd=="replay":
         result=manager(a,paths).replay(Path(a.receipt).expanduser()); emit(result,0 if result["status"]=="VERIFIED" else 2)
     if cmd=="capability-register": emit(CapabilityPlane(paths).register(a.capability_id,a.kind,a.provider,ttl_seconds=a.ttl,authorization_scopes=[x for x in a.scopes.split(",") if x],endpoint_ref=a.endpoint_ref,metadata=j(a.metadata_json,{})).to_dict())
-    if cmd=="capability-probe": emit(CapabilityPlane(paths).record_probe(a.capability_id,{x:getattr(a,x) for x in ("connected","authenticated","authorized","invokable","verified")},latency_ms=a.latency_ms,error=a.error,metadata=j(a.metadata_json,{})).to_dict())
+    if cmd=="capability-probe": emit(CapabilityPlane(paths).record_probe(a.capability_id,{x:getattr(a,x) for x in ("connected","authenticated","authorized","invokable","verified")},latency_ms=a.latency_ms,error=a.error,metadata=j(a.metadata_json,{}).to_dict()))
     if cmd=="capability-import": emit(CapabilityInventory(CapabilityPlane(paths)).import_inventory(j(a.inventory_json,{"capabilities":[]})))
     if cmd=="capabilities":
         plane=CapabilityPlane(paths); emit({"schema":"glaciereq.capability-selection.v2","capabilities":[x.to_dict() for x in plane.select(kind=a.kind,provider=a.provider,minimum_state=a.minimum_state)]} if a.eligible_only else plane.snapshot())
