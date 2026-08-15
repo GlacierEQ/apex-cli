@@ -1,15 +1,26 @@
 {
-  "schema": "glaciereq.bounded-capabilities.v1",
+  "schema": "glaciereq.bounded-capabilities.v2",
   "capabilities": [
     "repository-local-bash-command-dispatch",
-    "fail-closed-external-job-app-dependency-resolution",
-    "environment-controlled-local-path-resolution",
-    "fresh-install-bundled-runtime-bootstrap-and-status",
-    "explicit-external-casebuild-harness-boundary"
+    "pinned-sha256-canonical-runtime-projection",
+    "fresh-install-canonical-runtime-bootstrap-and-status",
+    "runtime-receipt-replay-and-attestation",
+    "resumable-lifecycle-cursor",
+    "idempotent-action-journal",
+    "capability-ttl-and-eligibility-evaluation",
+    "resource-governor-denial-and-provider-quota-state",
+    "runtime-health-readback",
+    "composition-receipt-separation"
   ],
+  "canonical_runtime_authority": {
+    "repository": "GlacierEQ/apex-boot-core",
+    "commit": "84a2907a316327e91dc0426f5407a34908aa4fc4"
+  },
   "operational_authority": false,
   "external_job_app_checkout_bundled": false,
   "casebuilder_or_red_helix_bundled": false,
   "dropbox_or_device_runtime_proven": false,
-  "live_mcp_apex_mesh_integration_claim": false
+  "live_mcp_apex_mesh_integration_claim": false,
+  "performance_or_scale_claim": false,
+  "note": "Capabilities are bounded to repository-local installation, verification, runtime semantics, and readback proven by the current PR proof surface. No external provider, production, scale, or device authority is implied."
 }

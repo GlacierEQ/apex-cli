@@ -1,0 +1,74 @@
+name: Finalize Runtime PR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Verify historical proof lineage
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+
+          with open('RUNTIME_PUBLIC_PROOF.json', encoding='utf-8') as handle:
+              proof = json.load(handle)
+          expected_commit = '84a2907a316327e91dc0426f5407a34908aa4fc4'
+          if proof.get('schema') != 'glaciereq.runtime-public-proof.v2':
+              raise SystemExit(f"proof schema mismatch: {proof.get('schema')!r}")
+          if proof.get('status') != 'VERIFIED':
+              raise SystemExit(f"proof status mismatch: {proof.get('status')!r}")
+          if proof.get('canonical_commit') != expected_commit:
+              raise SystemExit(f"proof canonical commit mismatch: {proof.get('canonical_commit')!r}")
+          tested_sha = proof.get('tested_sha')
+          if not tested_sha:
+              raise SystemExit('proof tested_sha missing')
+          result = subprocess.run(['git', 'merge-base', '--is-ancestor', tested_sha, 'HEAD'], check=False)
+          if result.returncode != 0:
+              raise SystemExit(f"historical proof is not on current lineage: {tested_sha}")
+          PY
+          cmp -s install.sh install-runtime-v2.sh
+      - name: Reprove current candidate against pinned runtime
+        shell: bash
+        run: |
+          home="$(mktemp -d)"
+          export HOME="$home"
+          bash ./install.sh >/tmp/final-install.log
+          receipt="$HOME/.apex/last_runtime_receipt.json"
+          "$HOME/bin/apex" replay "$receipt" >/tmp/final-replay.json
+          python - "$receipt" /tmp/final-replay.json <<'PY'
+          import json
+          import sys
+
+          expected_commit = '84a2907a316327e91dc0426f5407a34908aa4fc4'
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+          with open(sys.argv[2], encoding='utf-8') as handle:
+              replay = json.load(handle)
+          if receipt.get('schema') != 'glaciereq.runtime-receipt.v2':
+              raise SystemExit(f"receipt schema mismatch: {receipt.get('schema')!r}")
+          if receipt.get('status') != 'READY':
+              raise SystemExit(f"receipt status mismatch: {receipt.get('status')!r}")
+          runtime = receipt.get('runtime', {})
+          if runtime.get('canonical_commit') != expected_commit:
+              raise SystemExit(f"receipt canonical commit mismatch: {runtime.get('canonical_commit')!r}")
+          if replay.get('status') != 'VERIFIED':
+              raise SystemExit(f"replay status mismatch: {replay.get('status')!r}")
+          checks = replay.get('checks', [])
+          if not any(item.get('name') == 'canonical_commit' and item.get('passed') for item in checks):
+              raise SystemExit('canonical_commit replay check missing or failed')
+          PY

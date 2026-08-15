@@ -1,0 +1,179 @@
+rom") == source_capability]
+        for edge in sorted(candidates, key=lambda e: (e.get("priority", 100), e.get("to", ""))):
+            contract = edge["contract"]
+            if contract == "forbidden": continue
+            if contract == "read_only" and action != "read": continue
+            if contract == "non_persistent" and requires_persistence: continue
+            if contract == "degraded" and not allow_degraded: continue
+            destination = edge.get("to")
+            if not destination: continue
+            try:
+                if self.plane.eligible(destination, minimum_state=minimum_state): return dict(edge)
+            except KeyError:
+                pass
+        return None
+
+
+@dataclass
+class GovernorConfig:
+    worker_slots: int = 8
+    connector_concurrency: int = 4
+    provider_concurrency: dict[str, int] = field(default_factory=dict)
+    token_budget: int = 200_000
+    retry_limit: int = 3
+    deadline_seconds: int = 1800
+    lease_ttl_seconds: int = 300
+    rate_limit_backoff_cap_seconds: int = 300
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> "GovernorConfig":
+        value = dict(value or {})
+        defaults = cls()
+        return cls(worker_slots=int(value.get("worker_slots", defaults.worker_slots)), connector_concurrency=int(value.get("connector_concurrency", defaults.connector_concurrency)),
+            provider_concurrency={str(k): int(v) for k, v in value.get("provider_concurrency", {}).items()}, token_budget=int(value.get("token_budget", defaults.token_budget)),
+            retry_limit=int(value.get("retry_limit", defaults.retry_limit)), deadline_seconds=int(value.get("deadline_seconds", defaults.deadline_seconds)),
+            lease_ttl_seconds=int(value.get("lease_ttl_seconds", defaults.lease_ttl_seconds)), rate_limit_backoff_cap_seconds=int(value.get("rate_limit_backoff_cap_seconds", defaults.rate_limit_backoff_cap_seconds)))
+
+
+class ResourceGovernor:
+    def __init__(self, paths: RuntimePaths, config: GovernorConfig | Mapping[str, Any] | None = None) -> None:
+        self.paths = paths
+        self.config = config if isinstance(config, GovernorConfig) else GovernorConfig.from_mapping(config)
+
+    def _default_state(self) -> dict[str, Any]:
+        return {"schema": "glaciereq.resource-governor.v2", "updated_at": utc_now(), "tokens_used": 0, "leases": {}, "providers": {}}
+
+    def _load(self) -> dict[str, Any]:
+        state = read_json(self.paths.governor, self._default_state())
+        now = datetime.now(timezone.utc)
+        for lease_id in [lid for lid, lease in state.setdefault("leases", {}).items() if (parse_time(lease.get("expires_at")) or now) <= now]:
+            state["leases"].pop(lease_id, None)
+        return state
+
+    def _save(self, state: Mapping[str, Any]) -> None:
+        value = dict(state); value["updated_at"] = utc_now(); atomic_write_json(self.paths.governor, value)
+
+    def record_provider_backoff(self, provider: str, retry_after_seconds: int, *, quota_remaining: int | None = None, reason: str = "rate_limit") -> None:
+        state = self._load(); seconds = max(0, min(int(retry_after_seconds), self.config.rate_limit_backoff_cap_seconds))
+        state.setdefault("providers", {})[provider] = {"backoff_until": (datetime.now(timezone.utc)+timedelta(seconds=seconds)).isoformat(), "quota_remaining": quota_remaining, "reason": reason, "updated_at": utc_now()}
+        self._save(state); MetricsRecorder(self.paths).record("provider_backoff", seconds, {"provider": provider, "reason": reason})
+
+    def acquire(self, *, provider: str, operation: str, estimated_tokens: int = 0, priority: int = 0, run_id: str | None = None) -> dict[str, Any]:
+        state = self._load(); now = datetime.now(timezone.utc)
+        provider_state = state.setdefault("providers", {}).get(provider, {})
+        backoff_until = parse_time(provider_state.get("backoff_until"))
+        if backoff_until and now < backoff_until:
+            MetricsRecorder(self.paths).record("governor_denial", 1, {"reason":"provider_backoff","provider":provider})
+            return {"admitted":False,"reason":"provider_backoff","provider":provider,"retry_at":backoff_until.isoformat()}
+        if state.get("tokens_used", 0)+int(estimated_tokens) > self.config.token_budget:
+            return {"admitted":False,"reason":"token_budget","provider":provider}
+        leases = state.setdefault("leases", {}); active = list(leases.values())
+        if len(active) >= self.config.worker_slots:
+            self._inherit_priority(state, priority); self._save(state); return {"admitted":False,"reason":"worker_slots","provider":provider}
+        provider_limit = self.config.provider_concurrency.get(provider, self.config.connector_concurrency)
+        if len([l for l in active if l.get("provider")==provider]) >= provider_limit:
+            self._inherit_priority(state, priority, provider=provider); self._save(state); return {"admitted":False,"reason":"provider_concurrency","provider":provider}
+        lease_id = uuid.uuid4().hex
+        lease = {"lease_id":lease_id,"provider":provider,"operation":operation,"run_id":run_id,"priority":int(priority),"inherited_priority":int(priority),"estimated_tokens":int(estimated_tokens),"started_at":utc_now(),"expires_at":(now+timedelta(seconds=self.config.lease_ttl_seconds)).isoformat()}
+        leases[lease_id]=lease; state["tokens_used"]=state.get("tokens_used",0)+int(estimated_tokens); self._save(state)
+        MetricsRecorder(self.paths).record("governor_admission",1,{"provider":provider}); return {"admitted":True,"lease":lease}
+
+    def _inherit_priority(self, state: dict[str, Any], requested_priority: int, provider: str | None = None) -> None:
+        for lease in state.setdefault("leases", {}).values():
+            if provider and lease.get("provider") != provider: continue
+            if int(lease.get("inherited_priority", lease.get("priority",0))) < requested_priority: lease["inherited_priority"] = int(requested_priority)
+
+    def release(self, lease_id: str, *, actual_tokens: int | None = None) -> bool:
+        state=self._load(); lease=state.setdefault("leases",{}).pop(lease_id,None)
+        if not lease: return False
+        if actual_tokens is not None:
+            state["tokens_used"] = max(0, int(state.get("tokens_used",0))-int(lease.get("estimated_tokens",0))+int(actual_tokens))
+        self._save(state); return True
+
+    def snapshot(self) -> dict[str, Any]:
+        state=self._load(); return {**state,"config":asdict(self.config),"active_lease_count":len(state.get("leases",{}))}
+
+
+class LifecycleEngine:
+    def __init__(self, paths: RuntimePaths) -> None: self.paths=paths
+
+    def start(self, objective: str, *, run_id: str | None = None, source_predicates: Sequence[Mapping[str, Any]] | None = None, metadata: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        run_id=run_id or uuid.uuid4().hex; path=self.paths.run(run_id); objective_hash=sha256_bytes(objective.encode("utf-8"))
+        if path.exists():
+            existing=read_json(path)
+            if existing.get("objective_sha256") != objective_hash: raise InvalidTransition(f"run_id {run_id} already belongs to another objective")
+            return existing
+        now=utc_now(); state={"schema":RUN_SCHEMA,"run_id":run_id,"objective":objective,"objective_sha256":objective_hash,"status":"RUNNING","current_stage":"BOOT","completed_stages":[],"outstanding_dependencies":[],"continuation_cursor":{"stage":"BOOT","action_index":0},"source_predicates":[dict(x) for x in (source_predicates or [])],"metadata":dict(metadata or {}),"started_at":now,"updated_at":now,"stage_started_at":now,"stage_durations_ms":{},"resume_count":0}
+        atomic_write_json(path,state); MetricsRecorder(self.paths).record("run_started",1,{"run_id":run_id}); return state
+
+    def load(self, run_id: str) -> dict[str, Any]:
+        state=read_json(self.paths.run(run_id))
+        if not state: raise KeyError(run_id)
+        return state
+
+    def _save(self,state:dict[str,Any])->dict[str,Any]: state["updated_at"]=utc_now(); atomic_write_json(self.paths.run(state["run_id"]),state); return state
+
+    def checkpoint(self, run_id: str, *, current_stage: str | None = None, continuation_cursor: Mapping[str, Any] | None = None,
+                   outstanding_dependencies: Sequence[Mapping[str, Any] | str] | None = None, completed_stage: str | None = None) -> dict[str, Any]:
+        state=self.load(run_id)
+        if state.get("status") in FINAL_STATUSES: raise InvalidTransition(f"run {run_id} is terminal: {state['status']}")
+        if completed_stage:
+            if completed_stage not in RUNTIME_STAGES: raise InvalidTransition(f"unknown stage: {completed_stage}")
+            completed=state.setdefault("completed_stages",[])
+            if completed_stage not in completed: completed.append(completed_stage)
+            started=parse_time(state.get("stage_started_at"))
+            if started:
+                duration=(datetime.now(timezone.utc)-started).total_seconds()*1000; state.setdefault("stage_durations_ms",{})[completed_stage]=round(duration,3)
+                MetricsRecorder(self.paths).record(f"{completed_stage.lower()}_latency_ms",duration,{"run_id":run_id})
+        if current_stage:
+            if current_stage not in RUNTIME_STAGES: raise InvalidTransition(f"unknown stage: {current_stage}")
+            if current_stage not in state.get("completed_stages",[]):
+                target_index=RUNTIME_STAGES.index(current_stage)
+                first_incomplete=next((idx for idx,stage in enumerate(RUNTIME_STAGES) if stage not in state.get("completed_stages",[])),len(RUNTIME_STAGES))
+                if target_index > first_incomplete: raise InvalidTransition(f"cannot skip from first incomplete {RUNTIME_STAGES[first_incomplete]} to {current_stage}")
+            if current_stage != state.get("current_stage"): state["current_stage"],state["stage_started_at"] = current_stage,utc_now()
+        state["continuation_cursor"] = dict(continuation_cursor) if continuation_cursor is not None else {"stage":state["current_stage"],"action_index":state.get("continuation_cursor",{}).get("action_index",0)}
+        if outstanding_dependencies is not None: state["outstanding_dependencies"]=[dict(x) if isinstance(x,Mapping) else {"dependency":str(x)} for x in outstanding_dependencies]
+        return self._save(state)
+
+    def advance(self, run_id: str, *, cursor: Mapping[str, Any] | None = None, dependencies: Sequence[Mapping[str, Any] | str] | None = None) -> dict[str, Any]:
+        state=self.load(run_id); current=state["current_stage"]; idx=RUNTIME_STAGES.index(current)
+        next_stage = current if idx==len(RUNTIME_STAGES)-1 else RUNTIME_STAGES[idx+1]
+        return self.checkpoint(run_id,completed_stage=current,current_stage=next_stage,continuation_cursor=cursor or {"stage":next_stage,"action_index":0},outstanding_dependencies=dependencies or [])
+
+    def resume(self, run_id: str) -> dict[str, Any]:
+        start=time.perf_counter(); state=self.load(run_id)
+        if state.get("status") in FINAL_STATUSES: return {"run":state,"resumable":False,"next_stage":None,"cursor":state.get("continuation_cursor")}
+        completed=set(state.get("completed_stages",[])); next_stage=next((s for s in RUNTIME_STAGES if s not in completed),"PERSIST")
+        state["current_stage"],state["resume_count"],state["stage_started_at"] = next_stage,int(state.get("resume_count",0))+1,utc_now(); self._save(state)
+        duration=(time.perf_counter()-start)*1000; m=MetricsRecorder(self.paths); m.record("resume_attempted",1,{"run_id":run_id}); m.record("resume_succeeded",1,{"run_id":run_id}); m.record("state_recovery_latency_ms",duration,{"run_id":run_id})
+        return {"run":state,"resumable":True,"next_stage":next_stage,"cursor":state.get("continuation_cursor"),"outstanding_dependencies":state.get("outstanding_dependencies",[])}
+
+    def finalize(self, run_id: str, status: str) -> dict[str, Any]:
+        if status not in FINAL_STATUSES: raise InvalidTransition(f"invalid final status: {status}")
+        state=self.load(run_id)
+        if status=="READY" and "PERSIST" not in state.get("completed_stages",[]): raise InvalidTransition("READY requires PERSIST to be completed")
+        state["status"],state["finished_at"] = status,utc_now(); self._save(state); MetricsRecorder(self.paths).record("run_finalized",1,{"run_id":run_id,"status":status}); return state
+
+
+class ActionJournal:
+    def __init__(self, paths: RuntimePaths) -> None: self.paths=paths
+    def _load(self)->dict[str,Any]: return read_json(self.paths.action_index,{"schema":"glaciereq.action-index.v2","operations":{}})
+    def _save(self,v:Mapping[str,Any])->None: atomic_write_json(self.paths.action_index,v)
+    @staticmethod
+    def operation_id(run_id:str,action:str,target_identity:str,idempotency_key:str)->str: return sha256_json({"run_id":run_id,"action":action,"target_identity":target_identity,"idempotency_key":idempotency_key})
+
+    def begin(self, *, run_id:str, action:str, target_identity:str, idempotency_key:str, precondition_hash:str|None=None,
+              compensation_pointer:str|None=None, provider:str|None=None, metadata:Mapping[str,Any]|None=None)->dict[str,Any]:
+        index=self._load(); ops=index.setdefault("operations",{}); op_id=self.operation_id(run_id,action,target_identity,idempotency_key); existing=ops.get(op_id)
+        if existing: return {**existing,"reused":True,"must_not_repeat":existing.get("status")=="COMPLETE","requires_reconciliation":existing.get("status")=="PENDING"}
+        entry={"schema":"glaciereq.action-operation.v2","operation_id":op_id,"run_id":run_id,"action":action,"target_identity":target_identity,"idempotency_key":idempotency_key,"precondition_hash":precondition_hash,"compensation_pointer":compensation_pointer,"provider":provider,"metadata":dict(metadata or {}),"status":"PENDING","attempts":1,"created_at":utc_now(),"updated_at":utc_now()}
+        ops[op_id]=entry; self._save(index); append_jsonl(self.paths.action_log,{"event":"BEGIN","at":utc_now(),**entry}); MetricsRecorder(self.paths).record("action_started",1,{"provider":provider or "unknown","action":action})
+        return {**entry,"reused":False,"must_not_repeat":False,"requires_reconciliation":False}
+
+    def complete(self,operation_id:str,*,result:Mapping[str,Any]|None=None,readback:Mapping[str,Any]|None=None,postcondition_hash:str|None=None)->dict[str,Any]:
+        index=self._load(); entry=index.setdefault("operations",{}).get(operation_id)
+        if not entry: raise KeyError(operation_id)
+        if entry.get("status")=="COMPLETE": return {**entry,"reused":True,"must_not_repeat":True}
+        entry.update({"status":"COMPLETE","result":dict(result or {}),"readback":dict(readback or {}),"postcondition_hash":postcondition_hash,"updated_at":utc_now(),"completed_at":utc_now()})
+        self._save(index); append_jsonl(self.paths.action_log,{"event":"COMPLETE","at":utc_now(),**entry}); MetricsRecorder(se

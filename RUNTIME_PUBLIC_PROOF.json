@@ -1,0 +1,22 @@
+{
+  "schema": "glaciereq.runtime-public-proof.v2",
+  "status": "VERIFIED",
+  "tested_sha": "74221f660d6f3243776a6d4a01e0db065a6b6b30",
+  "canonical_repository": "GlacierEQ/apex-boot-core",
+  "canonical_commit": "84a2907a316327e91dc0426f5407a34908aa4fc4",
+  "proofs": [
+    "installer_sync",
+    "transparent_semantic_hashes",
+    "clean_home_boot",
+    "canonical_receipt",
+    "replay_attestation",
+    "capability_ttl",
+    "inventory_truth",
+    "resume_cursor",
+    "idempotency",
+    "governor_context_budget",
+    "provider_quota",
+    "runtime_health"
+  ],
+  "verified_at": "2026-08-15T06:39:38.139709+00:00"
+}

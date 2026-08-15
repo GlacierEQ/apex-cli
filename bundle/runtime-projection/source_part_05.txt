@@ -1,0 +1,138 @@
+s.objective, run_id=args.run_id, metadata=json_arg(args.metadata_json, {}), source_predicates=json_arg(args.predicates_json, []))
+        emit(state)
+
+    if args.command == "checkpoint":
+        state = LifecycleEngine(paths).checkpoint(args.run_id, current_stage=args.stage, completed_stage=args.complete_stage, continuation_cursor=json_arg(args.cursor_json, None), outstanding_dependencies=json_arg(args.dependencies_json, None))
+        emit(state)
+
+    if args.command == "advance":
+        emit(LifecycleEngine(paths).advance(args.run_id, cursor=json_arg(args.cursor_json, None), dependencies=json_arg(args.dependencies_json, None)))
+
+    if args.command == "finalize":
+        emit(LifecycleEngine(paths).finalize(args.run_id, args.status))
+
+    if args.command == "resume":
+        target = Path(args.target).expanduser()
+        if target.is_file():
+            emit(receipt_manager(args, paths).resume_from_receipt(target))
+        emit(LifecycleEngine(paths).resume(args.target))
+
+    if args.command == "receipt":
+        emit(receipt_manager(args, paths).create(args.run_id, status=args.status, activation_path=args.activation,
+            skills=json_arg(args.skills_json, []), source_predicates=json_arg(args.predicates_json, None), blockers=json_arg(args.blockers_json, []), continuation=json_arg(args.continuation_json, None)))
+
+    if args.command == "replay":
+        result = receipt_manager(args, paths).replay(Path(args.receipt).expanduser())
+        emit(result, code=0 if result["status"] == "VERIFIED" else 2)
+
+    if args.command == "capability-register":
+        emit(CapabilityPlane(paths).register(args.capability_id, args.kind, args.provider, ttl_seconds=args.ttl,
+            authorization_scopes=[x for x in args.scopes.split(",") if x], endpoint_ref=args.endpoint_ref, metadata=json_arg(args.metadata_json, {})).to_dict())
+
+    if args.command == "capability-probe":
+        checks = {"connected": args.connected, "authenticated": args.authenticated, "authorized": args.authorized, "invokable": args.invokable, "verified": args.verified}
+        emit(CapabilityPlane(paths).record_probe(args.capability_id, checks, latency_ms=args.latency_ms, error=args.error, metadata=json_arg(args.metadata_json, {})).to_dict())
+
+
+    if args.command == "capability-import":
+        emit(CapabilityInventory(CapabilityPlane(paths)).import_inventory(json_arg(args.inventory_json, {"capabilities": []})))
+
+    if args.command == "capabilities":
+        plane = CapabilityPlane(paths)
+        if args.eligible_only:
+            records = plane.select(kind=args.kind, provider=args.provider, minimum_state=args.minimum_state)
+            emit({"schema": "glaciereq.capability-selection.v2", "capabilities": [x.to_dict() for x in records]})
+        emit(plane.snapshot())
+
+    if args.command == "fallback":
+        edge = ContractFallbackGraph.from_path(CapabilityPlane(paths), Path(args.graph).expanduser()).choose(args.source, action=args.action,
+            requires_persistence=args.requires_persistence, minimum_state=args.minimum_state, allow_degraded=not args.no_degraded)
+        emit({"schema": "glaciereq.fallback-selection.v2", "source": args.source, "selected": edge}, code=0 if edge else 3)
+
+    journal = ActionJournal(paths)
+    if args.command == "action-begin":
+        emit(journal.begin(run_id=args.run_id, action=args.action, target_identity=args.target, idempotency_key=args.idempotency_key,
+            precondition_hash=args.precondition_hash, compensation_pointer=args.compensation_pointer, provider=args.provider, metadata=json_arg(args.metadata_json, {})))
+    if args.command == "action-complete":
+        emit(journal.complete(args.operation_id, result=json_arg(args.result_json, {}), readback=json_arg(args.readback_json, {}), postcondition_hash=args.postcondition_hash))
+    if args.command == "action-fail":
+        emit(journal.fail(args.operation_id, error=args.error, retryable=args.retryable, retry_after_seconds=args.retry_after))
+    if args.command == "action-retry":
+        emit(journal.retry(args.operation_id, reconciliation=json_arg(args.reconciliation_json, {})))
+
+    if args.command.startswith("governor-"):
+        config = json_arg(args.config_json, {}) if hasattr(args, "config_json") else {}
+        governor = EconomicResourceGovernor(paths, config)
+        if args.command == "governor-acquire": emit(governor.acquire(provider=args.provider, operation=args.operation, estimated_tokens=args.estimated_tokens, estimated_context_tokens=args.estimated_context_tokens, priority=args.priority, run_id=args.run_id, attempt=args.attempt), code=0)
+        if args.command == "governor-release": emit({"released": governor.release(args.lease_id, actual_tokens=args.actual_tokens, actual_context_tokens=args.actual_context_tokens)})
+        if args.command == "governor-backoff": governor.record_provider_backoff(args.provider, args.retry_after, quota_remaining=args.quota_remaining, reason=args.reason); emit(governor.snapshot())
+        if args.command == "governor-provider-state": governor.record_provider_state(args.provider, quota_remaining=args.quota_remaining, reset_after_seconds=args.reset_after, metadata=json_arg(args.metadata_json, {})); emit(governor.snapshot())
+        if args.command == "governor-status": emit(governor.snapshot())
+
+    if args.command == "metric":
+        MetricsRecorder(paths).record(args.name, args.value, json_arg(args.labels_json, {})); emit({"recorded": True, "name": args.name, "value": args.value})
+
+    if args.command == "health":
+        slo = read_json(Path(args.slo).expanduser(), {})
+        emit(RuntimeHealthV2(paths, slo).report())
+
+
+if __name__ == "__main__":
+    main()
+<<<GLACIEREQ_FILE scripts/verify_runtime_projection.py 2013>>>
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", required=True)
+    parser.add_argument("--manifest", default="RUNTIME_PROJECTION.json")
+    parser.add_argument("--expect-commit")
+    args = parser.parse_args()
+    root = Path(args.root).resolve()
+    manifest_path = root / args.manifest
+    if not manifest_path.is_file():
+        print(json.dumps({"status": "FAILED", "errors": [f"missing {manifest_path}"]}, indent=2))
+        return 1
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    errors = []
+    if manifest.get("schema") != "glaciereq.runtime-projection.v2":
+        errors.append("projection schema drift")
+    if manifest.get("canonical_repository") != "GlacierEQ/apex-boot-core":
+        errors.append("canonical repository drift")
+    if args.expect_commit and manifest.get("canonical_commit") != args.expect_commit:
+        errors.append("canonical commit drift")
+    for rel, expected in manifest.get("files", {}).items():
+        path = root / rel
+        if not path.is_file():
+            errors.append(f"missing projected file: {rel}")
+            continue
+        actual = sha256(path)
+        if actual != expected:
+            errors.append(f"checksum drift: {rel}")
+    print(json.dumps({
+        "schema": "glaciereq.runtime-projection-verification.v2",
+        "status": "VERIFIED" if not errors else "FAILED",
+        "canonical_commit": manifest.get("canonical_commit"),
+        "files_checked": len(manifest.get("files", {})),
+        "errors": errors,
+    }, indent=2, sort_keys=True))
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
