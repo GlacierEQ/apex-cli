@@ -1,70 +1,61 @@
 {
   "schema": "glaciereq.repo-excellence-state.v1",
   "repository": "GlacierEQ/apex-cli",
-  "principal_state": "DISCOVERED",
+  "principal_state": "FUNCTIONAL_CANDIDATE",
+  "state": "FUNCTIONAL_CANDIDATE",
+  "operational_authority": false,
+  "verified_scope": [
+    "repository-local-bash-command-dispatch",
+    "fail-closed-external-job-app-dependency-resolution",
+    "environment-controlled-local-path-resolution",
+    "fresh-install-bundled-runtime-bootstrap-and-status",
+    "explicit-external-casebuild-harness-boundary"
+  ],
   "gates": {
     "IDENTITY_RESOLVED": {
-      "status": "PENDING"
-    },
-    "PROBLEM_VERIFIED": {
-      "status": "PENDING"
-    },
-    "TARGET_CONTRACT_FROZEN": {
-      "status": "PENDING"
-    },
-    "DONOR_PLAN_RESOLVED": {
-      "status": "PENDING"
-    },
-    "VERTICAL_SLICE_ALIVE": {
-      "status": "PENDING"
+      "status": "PASS",
+      "evidence": "README defines APEX CLI as a bounded repository-local Bash dispatcher with explicit external dependency boundaries"
     },
     "CENTRAL_MECHANISM_PRESENT": {
-      "status": "PENDING"
+      "status": "PASS",
+      "evidence": "apex dispatcher, install.sh bootstrap, core/ path helpers, and bounded public tests"
+    },
+    "PRIOR_EXACT_HEAD_PROOF": {
+      "status": "PASS",
+      "evidence": {
+        "head_sha": "52de097a68d7813e7b153e5f5164187d28d5335d",
+        "workflow_run": 31778628138,
+        "conclusion": "success",
+        "scope": "exact-source Public Truth Gate on Python 3.11 and 3.13 including fresh-install runtime proof"
+      }
+    },
+    "LEGACY_DEBT_VISIBLE": {
+      "status": "PASS",
+      "evidence": "scheduled CI keeps preserved whole-tree lint debt fail-visible and outside the admitted bounded surface"
+    },
+    "PROJECTION_TRUTH_CLOSED": {
+      "status": "PASS",
+      "evidence": "README and machine capability allowlist reject bundled external checkouts, device assumptions, and unproven external runtime authority"
     },
     "DETERMINISTIC_PROOF_GREEN": {
-      "status": "PENDING"
-    },
-    "ADVERSARIAL_SURVIVAL": {
-      "status": "PENDING"
-    },
-    "OPERABLE_AND_OBSERVABLE": {
-      "status": "PENDING"
-    },
-    "PROOF_RECEIPT_BOUND": {
-      "status": "PENDING"
-    },
-    "AUTHORITY_BOUND": {
-      "status": "PENDING"
+      "status": "PENDING_CANONICAL_CI",
+      "evidence": "machine-state and proof-matrix changes require fresh successful exact-current-head Public Truth Gate"
     },
     "CANONICAL_POSITION_RESOLVED": {
       "status": "PENDING"
-    },
-    "EVOLUTION_CURSOR_DEFINED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:12Z",
-      "evidence": "honest non-PROMOTED; cursor defined"
     }
   },
-  "history": [],
-  "contract_ref": "machine/target-contract.json",
-  "scores_ref": "machine/excellence-scores.json",
-  "evolution_cursor": "next:canonical_position_only_if_estate_role_resolved",
-  "wave": {
-    "id": "ELITE-ESTATE-SCHEMA-MIGRATE-2026-08-10",
-    "proof_ok": false,
-    "operable_ok": false,
-    "migrated_at": "2026-08-10T05:56Z",
-    "from_schema": "glaciereq.repo-excellence.record.v1",
-    "history_repaired_at": "2026-08-10T06:12Z"
+  "nonclaims": [
+    "no bundled or proven Casebuilder4000 Red Helix or job-application checkout",
+    "no Dropbox Android Termux or other device runtime proof",
+    "no authenticated or reachable external provider implied by local command names",
+    "no production operational authority over external systems",
+    "no claim that preserved legacy whole-tree lint debt is resolved",
+    "no live MCP APEX mesh or external control-plane integration inferred from repository-local files"
+  ],
+  "historical_artifacts": {
+    "prior_discovered_gap_receipt_is_superseded_by_current_exact_head_public_truth_proof": true,
+    "legacy_whole_tree_debt_remains_visible_outside_bounded_admission_scope": true
   },
-  "state": "DISCOVERED",
-  "gap_receipt_ref": "machine/gap-receipt.json",
-  "demotion": {
-    "at": "2026-08-10T05:56Z",
-    "from_claim": "PROMOTED",
-    "to": "DISCOVERED",
-    "reason": "schema migrate: PROMOTED XOR gap-receipt",
-    "blocker": "OPERATE_THEATER",
-    "rule": "PROMOTED XOR gap-receipt"
-  }
+  "evolution_cursor": "fresh_exact_head_public_truth_then_surface_reconciliation"
 }
