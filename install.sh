@@ -25,10 +25,17 @@ while True:
     pos=bundle.find(prefix,pos)
     if pos<0: break
     try:
-        end=bundle.index(b'\n',pos); header=bundle[pos+len(prefix):end-3].decode('utf-8'); rel,size_s=header.rsplit(' ',1); size=int(size_s); start=end+1; payload=bundle[start:start+size]
+        end=bundle.index(b'\n',pos); header=bundle[pos+len(prefix):end-3].decode('utf-8'); rel,size_s=header.rsplit(' ',1); size=int(size_s); start=end+1
     except (ValueError,UnicodeDecodeError): pos+=len(prefix); continue
-    if len(payload)==size and rel in expected and hashlib.sha256(payload).hexdigest()==expected[rel]: candidates[rel].append(payload)
-    pos=start+max(size,1)
+    next_pos=bundle.find(prefix,start)
+    record_end=len(bundle) if next_pos<0 else next_pos
+    payloads=[bundle[start:start+size]]
+    framed=bundle[start:record_end]
+    if framed != payloads[0]: payloads.append(framed)
+    if rel in expected:
+        for payload in payloads:
+            if hashlib.sha256(payload).hexdigest()==expected[rel] and payload not in candidates[rel]: candidates[rel].append(payload)
+    pos=record_end
 repo=meta['canonical_repository']
 for rel,digest in expected.items():
     matches=candidates[rel]
@@ -44,7 +51,7 @@ for rel,digest in expected.items():
         matches=[payload]
     if len(matches)!=1: raise SystemExit(f'canonical payload cardinality mismatch: {rel} matches={len(matches)}')
     target=dest/rel; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(matches[0])
-projection={'schema':'glaciereq.runtime-projection.v2','canonical_repository':meta['canonical_repository'],'canonical_commit':commit,'files':expected,'generated_at':datetime.now(timezone.utc).isoformat(),'projection_law':'Prefer unique locally bundled payloads matching pinned SHA-256; when a local payload is absent, recover only from the exact pinned canonical GitHub commit and require the same pinned digest before materialization.'}; (dest/'RUNTIME_PROJECTION.json').write_text(json.dumps(projection,indent=2,sort_keys=True)+'\n')
+projection={'schema':'glaciereq.runtime-projection.v2','canonical_repository':meta['canonical_repository'],'canonical_commit':commit,'files':expected,'generated_at':datetime.now(timezone.utc).isoformat(),'projection_law':'Prefer unique locally bundled payloads matching pinned SHA-256; transport size metadata is advisory only and framed payloads are accepted solely when the pinned digest matches; when a local payload is absent, recover only from the exact pinned canonical GitHub commit and require the same pinned digest before materialization.'}; (dest/'RUNTIME_PROJECTION.json').write_text(json.dumps(projection,indent=2,sort_keys=True)+'\n')
 PY
 cp "$ADAPTER_DIR/runtime_cli.py" "$PROJECTION_STAGE/scripts/runtime_cli.py"; cp "$ADAPTER_DIR/verify_projection.py" "$PROJECTION_STAGE/scripts/verify_runtime_projection.py"; chmod +x "$PROJECTION_STAGE/scripts/"*.py
 python3 "$PROJECTION_STAGE/scripts/verify_runtime_projection.py" --root "$PROJECTION_STAGE" --expect-commit "$CANONICAL_COMMIT" >/dev/null
