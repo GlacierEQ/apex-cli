@@ -1,1 +1,15 @@
-{"capabilities": ["hyper-scaling"]}
+{
+  "schema": "glaciereq.bounded-capabilities.v1",
+  "capabilities": [
+    "repository-local-bash-command-dispatch",
+    "fail-closed-external-job-app-dependency-resolution",
+    "environment-controlled-local-path-resolution",
+    "fresh-install-bundled-runtime-bootstrap-and-status",
+    "explicit-external-casebuild-harness-boundary"
+  ],
+  "operational_authority": false,
+  "external_job_app_checkout_bundled": false,
+  "casebuilder_or_red_helix_bundled": false,
+  "dropbox_or_device_runtime_proven": false,
+  "live_mcp_apex_mesh_integration_claim": false
+}
