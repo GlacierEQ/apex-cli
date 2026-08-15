@@ -1,70 +1,67 @@
 {
-  "schema": "glaciereq.repo-excellence-state.v1",
+  "schema": "glaciereq.repo-excellence-state.v2",
   "repository": "GlacierEQ/apex-cli",
-  "principal_state": "DISCOVERED",
-  "gates": {
-    "IDENTITY_RESOLVED": {
-      "status": "PENDING"
+  "role": "specialist component: distribution and operator CLI for the canonical resumable Apex runtime",
+  "canonical_runtime_authority": {
+    "repository": "GlacierEQ/apex-boot-core",
+    "commit": "84a2907a316327e91dc0426f5407a34908aa4fc4"
+  },
+  "candidate_lineage": {
+    "base_branch": "master",
+    "base_sha": "52de097a68d7813e7b153e5f5164187d28d5335d",
+    "source_head_before_receipt": "92185da0d896d98329e1397da7ff97f14a1b4bc3",
+    "pr": 3
+  },
+  "language_lanes": [
+    {
+      "technology": "Bash",
+      "boundary": "installation, atomic filesystem projection replacement, and shell CLI composition",
+      "reason": "native operator boundary; no new runtime language is justified for the current provenance defect"
     },
-    "PROBLEM_VERIFIED": {
-      "status": "PENDING"
+    {
+      "technology": "Python",
+      "boundary": "canonical runtime semantics, deterministic verification, receipts, replay, governor, and capability logic",
+      "reason": "inherited from the pinned apex-boot-core runtime authority and repository-native proof surface"
     },
-    "TARGET_CONTRACT_FROZEN": {
-      "status": "PENDING"
-    },
-    "DONOR_PLAN_RESOLVED": {
-      "status": "PENDING"
-    },
-    "VERTICAL_SLICE_ALIVE": {
-      "status": "PENDING"
-    },
-    "CENTRAL_MECHANISM_PRESENT": {
-      "status": "PENDING"
-    },
-    "DETERMINISTIC_PROOF_GREEN": {
-      "status": "PENDING"
-    },
-    "ADVERSARIAL_SURVIVAL": {
-      "status": "PENDING"
-    },
-    "OPERABLE_AND_OBSERVABLE": {
-      "status": "PENDING"
-    },
-    "PROOF_RECEIPT_BOUND": {
-      "status": "PENDING"
-    },
-    "AUTHORITY_BOUND": {
-      "status": "PENDING"
-    },
-    "CANONICAL_POSITION_RESOLVED": {
-      "status": "PENDING"
-    },
-    "EVOLUTION_CURSOR_DEFINED": {
-      "status": "PASS",
-      "at": "2026-08-10T06:12Z",
-      "evidence": "honest non-PROMOTED; cursor defined"
+    {
+      "technology": "JSON/YAML",
+      "boundary": "versioned machine contracts, semantic digests, receipts, and CI policy",
+      "reason": "declarative interchange and proof-control boundary"
     }
+  ],
+  "unique_value": "Apex CLI packages, installs, verifies, operates, replays, resumes, and health-checks the pinned Apex Boot Core runtime while keeping composition evidence separate from runtime authority.",
+  "current_bottleneck": "Obtain current-head end-to-end runtime proof after replacing incomplete historical transport assumptions with pinned-source, SHA-256-verified recovery and synchronized installer ownership.",
+  "frontier_alternatives_considered": [
+    {
+      "candidate": "new runtime/compiler language or toolchain",
+      "decision": "RETAIN_INCUMBENT",
+      "reason": "current blocker is provenance-complete source projection, not language/runtime performance or correctness"
+    }
+  ],
+  "gates": {
+    "problem_verified": "PASS",
+    "unique_value_known": "PASS",
+    "canonical_identity_known": "PASS",
+    "central_mechanism_implemented": "PASS_WITH_CURRENT_PROOF_PENDING",
+    "deterministic_tests_pass": "PENDING_CURRENT_HEAD",
+    "adversarial_tests_pass": "PENDING_CURRENT_HEAD",
+    "runtime_behavior_observed": "PENDING_CURRENT_HEAD",
+    "security_authority_bounded": "PASS_BY_CONTRACT",
+    "proof_receipt_bound_to_sha": "PENDING_CURRENT_HEAD",
+    "reusable_capabilities_extracted": "PASS",
+    "projections_truth_consistent": "PASS_BY_CURRENT_MANIFEST_AND_INSTALLER_OWNERSHIP",
+    "evolution_cursor_defined": "PASS"
   },
-  "history": [],
-  "contract_ref": "machine/target-contract.json",
-  "scores_ref": "machine/excellence-scores.json",
-  "evolution_cursor": "next:canonical_position_only_if_estate_role_resolved",
-  "wave": {
-    "id": "ELITE-ESTATE-SCHEMA-MIGRATE-2026-08-10",
-    "proof_ok": false,
-    "operable_ok": false,
-    "migrated_at": "2026-08-10T05:56Z",
-    "from_schema": "glaciereq.repo-excellence.record.v1",
-    "history_repaired_at": "2026-08-10T06:12Z"
+  "historical_proof": {
+    "note": "Older passing local and branch proofs remain historical after source movement and do not prove the current candidate."
   },
-  "state": "DISCOVERED",
-  "gap_receipt_ref": "machine/gap-receipt.json",
-  "demotion": {
-    "at": "2026-08-10T05:56Z",
-    "from_claim": "PROMOTED",
-    "to": "DISCOVERED",
-    "reason": "schema migrate: PROMOTED XOR gap-receipt",
-    "blocker": "OPERATE_THEATER",
-    "rule": "PROMOTED XOR gap-receipt"
-  }
+  "repairs_this_chain": [
+    "consume restored canonical governor_defaults payload in CANONICAL_SEMANTICS parts",
+    "preserve all pinned canonical SHA-256 identities",
+    "make install-runtime-v2.sh the synchronization authority for pinned-source recovery",
+    "recover only zero-local-match paths from the exact pinned canonical GitHub commit and require the existing pinned SHA-256 before materialization",
+    "keep duplicate local canonical matches fail-closed"
+  ],
+  "rollback": "Revert the focused PR commits; canonical master and apex-boot-core authority remain unchanged until merge.",
+  "next_cursor": "Execute repository-native Final Runtime Proof and Public Truth on the exact receipt head; repair any bounded failure; close valid review findings; merge only after complete exact-head proof, then read back canonical master and require post-merge proof."
 }
