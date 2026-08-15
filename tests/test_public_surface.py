@@ -34,6 +34,13 @@ def test_ready_finalize_requires_same_run_attested_receipt(tmp_path: Path) -> No
     assert finalize.returncode!=0
     assert 'READY requires a persisted READY receipt for the same run' in finalize.stderr
 
+def test_invalid_json_file_argument_fails_with_stable_reason(tmp_path: Path) -> None:
+    env,apex=installed_apex(tmp_path)
+    invalid=tmp_path/'invalid.json'; invalid.write_text('{not-json',encoding='utf-8')
+    completed=subprocess.run([str(apex),'runtimectl','start','invalid json proof','--run-id','invalid-json-run','--metadata-json',str(invalid)],env=env,text=True,capture_output=True,check=False)
+    assert completed.returncode!=0
+    assert 'json_input_file_invalid' in completed.stderr
+
 def test_concurrent_action_begin_reuses_one_operation(tmp_path: Path) -> None:
     env,apex=installed_apex(tmp_path)
     start=subprocess.run([str(apex),'runtimectl','start','concurrency proof','--run-id','concurrent-run'],env=env,text=True,capture_output=True,check=False); assert start.returncode==0,start.stderr
