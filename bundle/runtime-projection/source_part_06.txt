@@ -1,0 +1,17 @@
+<<<GLACIEREQ_FILE runtime/contracts/governor_defaults.json 352>>>
+{
+  "schema": "glaciereq.resource-governor-config.v2",
+  "worker_slots": 8,
+  "connector_concurrency": 4,
+  "provider_concurrency": {
+    "github": 2,
+    "memory": 3,
+    "model": 4
+  },
+  "token_budget": 200000,
+  "context_budget": 200000,
+  "retry_limit": 3,
+  "deadline_seconds": 1800,
+  "lease_ttl_seconds": 300,
+  "rate_limit_backoff_cap_seconds": 300
+}
