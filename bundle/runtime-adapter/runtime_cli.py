@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +31,19 @@ def j(value, default):
     except OSError:
         is_file = False
     return json.loads(path.read_text(encoding="utf-8")) if is_file else json.loads(value)
+
+
+@contextmanager
+def transaction(paths: RuntimePaths):
+    """Serialize public mutable runtime operations across local processes."""
+    paths.root.mkdir(parents=True, exist_ok=True)
+    lock_path = paths.root / ".runtime_cli.lock"
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def parser():
@@ -69,6 +84,23 @@ def manager(a, paths):
     return AttestedReceiptManager(paths, contract_dir=Path(a.contract_dir), canonical_commit=a.canonical_commit, compiler_path=Path(a.compiler_path))
 
 
+def finalize(a, paths):
+    if a.status != "READY":
+        with transaction(paths):
+            return LifecycleEngine(paths).finalize(a.run_id, a.status)
+    receipt = read_json(paths.last_receipt, {})
+    if receipt.get("run_id") != a.run_id or receipt.get("status") != "READY":
+        raise SystemExit("READY requires a persisted READY receipt for the same run")
+    replay = manager(a, paths).replay(paths.last_receipt)
+    if replay.get("status") != "VERIFIED" or not any(
+        item.get("name") == "canonical_commit" and item.get("passed")
+        for item in replay.get("checks", [])
+    ):
+        raise SystemExit("READY requires verified replay attestation against the pinned canonical runtime")
+    with transaction(paths):
+        return LifecycleEngine(paths).finalize(a.run_id, a.status)
+
+
 def main():
     a=parser().parse_args(); paths=RuntimePaths(Path(a.state_root).expanduser()); cmd=a.cmd
     if cmd=="validate-contract":
@@ -76,7 +108,7 @@ def main():
     if cmd=="start": emit(LifecycleEngine(paths).start(a.objective,run_id=a.run_id,metadata=j(a.metadata_json,{}),source_predicates=j(a.predicates_json,[])))
     if cmd=="checkpoint": emit(LifecycleEngine(paths).checkpoint(a.run_id,current_stage=a.stage,completed_stage=a.complete_stage,continuation_cursor=j(a.cursor_json,None),outstanding_dependencies=j(a.dependencies_json,None)))
     if cmd=="advance": emit(LifecycleEngine(paths).advance(a.run_id,cursor=j(a.cursor_json,None),dependencies=j(a.dependencies_json,None)))
-    if cmd=="finalize": emit(LifecycleEngine(paths).finalize(a.run_id,a.status))
+    if cmd=="finalize": emit(finalize(a, paths))
     if cmd=="resume":
         target=Path(a.target).expanduser(); emit(manager(a,paths).resume_from_receipt(target) if target.is_file() else LifecycleEngine(paths).resume(a.target))
     if cmd=="receipt": emit(manager(a,paths).create(a.run_id,status=a.status,activation_path=a.activation,skills=j(a.skills_json,[]),source_predicates=j(a.predicates_json,None),blockers=j(a.blockers_json,[]),continuation=j(a.continuation_json,None)))
@@ -90,16 +122,32 @@ def main():
     if cmd=="fallback":
         edge=ContractFallbackGraph.from_path(CapabilityPlane(paths),Path(a.graph)).choose(a.source,action=a.action,requires_persistence=a.requires_persistence,minimum_state=a.minimum_state,allow_degraded=not a.no_degraded); emit({"schema":"glaciereq.fallback-selection.v2","source":a.source,"selected":edge},0 if edge else 3)
     journal=ActionJournal(paths)
-    if cmd=="action-begin": emit(journal.begin(run_id=a.run_id,action=a.action,target_identity=a.target,idempotency_key=a.idempotency_key,precondition_hash=a.precondition_hash,compensation_pointer=a.compensation_pointer,provider=a.provider,metadata=j(a.metadata_json,{})))
-    if cmd=="action-complete": emit(journal.complete(a.operation_id,result=j(a.result_json,{}),readback=j(a.readback_json,{}),postcondition_hash=a.postcondition_hash))
-    if cmd=="action-fail": emit(journal.fail(a.operation_id,error=a.error,retryable=a.retryable,retry_after_seconds=a.retry_after))
-    if cmd=="action-retry": emit(journal.retry(a.operation_id,reconciliation=j(a.reconciliation_json,{})))
+    if cmd=="action-begin":
+        with transaction(paths): result=journal.begin(run_id=a.run_id,action=a.action,target_identity=a.target,idempotency_key=a.idempotency_key,precondition_hash=a.precondition_hash,compensation_pointer=a.compensation_pointer,provider=a.provider,metadata=j(a.metadata_json,{}))
+        emit(result)
+    if cmd=="action-complete":
+        with transaction(paths): result=journal.complete(a.operation_id,result=j(a.result_json,{}),readback=j(a.readback_json,{}),postcondition_hash=a.postcondition_hash)
+        emit(result)
+    if cmd=="action-fail":
+        with transaction(paths): result=journal.fail(a.operation_id,error=a.error,retryable=a.retryable,retry_after_seconds=a.retry_after)
+        emit(result)
+    if cmd=="action-retry":
+        with transaction(paths): result=journal.retry(a.operation_id,reconciliation=j(a.reconciliation_json,{}))
+        emit(result)
     if cmd.startswith("governor-"):
         gov=EconomicResourceGovernor(paths,j(getattr(a,"config_json",None),{}))
-        if cmd=="governor-acquire": emit(gov.acquire(provider=a.provider,operation=a.operation,estimated_tokens=a.estimated_tokens,estimated_context_tokens=a.estimated_context_tokens,priority=a.priority,run_id=a.run_id,attempt=a.attempt))
-        if cmd=="governor-release": emit({"released":gov.release(a.lease_id,actual_tokens=a.actual_tokens,actual_context_tokens=a.actual_context_tokens)})
-        if cmd=="governor-backoff": gov.record_provider_backoff(a.provider,a.retry_after,quota_remaining=a.quota_remaining,reason=a.reason); emit(gov.snapshot())
-        if cmd=="governor-provider-state": gov.record_provider_state(a.provider,quota_remaining=a.quota_remaining,reset_after_seconds=a.reset_after,metadata=j(a.metadata_json,{})); emit(gov.snapshot())
+        if cmd=="governor-acquire":
+            with transaction(paths): result=gov.acquire(provider=a.provider,operation=a.operation,estimated_tokens=a.estimated_tokens,estimated_context_tokens=a.estimated_context_tokens,priority=a.priority,run_id=a.run_id,attempt=a.attempt)
+            emit(result)
+        if cmd=="governor-release":
+            with transaction(paths): released=gov.release(a.lease_id,actual_tokens=a.actual_tokens,actual_context_tokens=a.actual_context_tokens)
+            emit({"released":released})
+        if cmd=="governor-backoff":
+            with transaction(paths): gov.record_provider_backoff(a.provider,a.retry_after,quota_remaining=a.quota_remaining,reason=a.reason)
+            emit(gov.snapshot())
+        if cmd=="governor-provider-state":
+            with transaction(paths): gov.record_provider_state(a.provider,quota_remaining=a.quota_remaining,reset_after_seconds=a.reset_after,metadata=j(a.metadata_json,{}))
+            emit(gov.snapshot())
         if cmd=="governor-status": emit(gov.snapshot())
     if cmd=="metric": MetricsRecorder(paths).record(a.name,a.value,j(a.labels_json,{})); emit({"recorded":True,"name":a.name,"value":a.value})
     if cmd=="health": emit(RuntimeHealthV2(paths,read_json(Path(a.slo),{})).report())
