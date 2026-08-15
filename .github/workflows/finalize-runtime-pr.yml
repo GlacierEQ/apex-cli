@@ -7,8 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   finalize:
@@ -17,33 +16,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feat/canonical-runtime-projection-v2
+          ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - name: Verify proof lineage
         shell: bash
         run: |
           python - <<'PY'
-          import json,subprocess
-          p=json.load(open('RUNTIME_PUBLIC_PROOF.json'))
-          assert p['schema']=='glaciereq.runtime-public-proof.v2' and p['status']=='VERIFIED', p
-          assert p['canonical_commit']=='84a2907a316327e91dc0426f5407a34908aa4fc4', p
-          parent=subprocess.check_output(['git','rev-parse','HEAD^'],text=True).strip()
-          assert p['tested_sha']==parent,(p['tested_sha'],parent)
+          import json
+          import subprocess
+
+          with open('RUNTIME_PUBLIC_PROOF.json', encoding='utf-8') as handle:
+              proof = json.load(handle)
+          assert proof['schema'] == 'glaciereq.runtime-public-proof.v2', proof
+          assert proof['status'] == 'VERIFIED', proof
+          assert proof['canonical_commit'] == '84a2907a316327e91dc0426f5407a34908aa4fc4', proof
+          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
+          assert proof['tested_sha'] == parent, (proof['tested_sha'], parent)
           PY
           cmp -s install.sh install-runtime-v2.sh
       - name: Reprove marker commit
         shell: bash
         run: |
-          home="$(mktemp -d)"; export HOME="$home"
+          home="$(mktemp -d)"
+          export HOME="$home"
           bash ./install.sh >/tmp/final-install.log
           "$HOME/bin/apex" replay "$HOME/.apex/last_runtime_receipt.json" >/tmp/final-replay.json
           python - /tmp/final-replay.json <<'PY'
-          import json,sys
-          p=json.load(open(sys.argv[1])); assert p['status']=='VERIFIED',p
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              replay = json.load(handle)
+          assert replay['status'] == 'VERIFIED', replay
           PY
-      - name: Merge verified runtime PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr merge 3 --repo GlacierEQ/apex-cli --squash --delete-branch=false --subject 'feat(runtime): distribute canonical resumable capability kernel' --body 'Merged only after Final Runtime Proof persisted a VERIFIED marker and marker-commit clean-home replay re-attested successfully.'
