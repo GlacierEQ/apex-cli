@@ -8,7 +8,8 @@
     {"name": "canonical_part_02.txt"},
     {"name": "canonical_part_03.txt"},
     {"name": "canonical_part_04.txt"},
-    {"name": "source_part_06.txt"}
+    {"name": "source_part_06.txt"},
+    {"name": "source_part_07.txt"}
   ],
   "files": {
     "runtime/compiler.py": "eb4a94f873d8d545087effd05fe18eb1373a70390f67605d967ed1cbced48409",
