@@ -37,7 +37,9 @@ jobs:
       - name: Install public proof dependency
         run: python -m pip install --upgrade pytest
       - name: Compile repository-local Python surfaces
-        run: python -m compileall -q core tests bundle/scripts/verify_mem0_layers.py bundle/scripts/dynamic_skill_activator.py
+        run: python -m compileall -q core tests scripts/verify_public_truth.py bundle/scripts/verify_mem0_layers.py bundle/scripts/dynamic_skill_activator.py
+      - name: Verify bounded public and machine truth
+        run: python scripts/verify_public_truth.py
       - name: Run bounded public-surface tests
         run: python -m pytest -q tests/test_public_surface.py
       - name: Verify shell entrypoint syntax and behavior
