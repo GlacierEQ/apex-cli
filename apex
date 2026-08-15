@@ -17,7 +17,11 @@ exec_local_or_bin() {
 require_home() { [[ -n "$HOME_DIR" ]] || { echo "APEX runtime unavailable: HOME is unset" >&2; exit 78; }; }
 runtime_control() {
     require_home
-    local root="$HOME_DIR/.apex/runtime_projection" cli="$root/scripts/runtime_cli.py" compiler="$root/runtime/compiler.py" contracts="$root/runtime/contracts"
+    local root cli compiler contracts
+    root="$HOME_DIR/.apex/runtime_projection"
+    cli="$root/scripts/runtime_cli.py"
+    compiler="$root/runtime/compiler.py"
+    contracts="$root/runtime/contracts"
     [[ -f "$cli" && -f "$compiler" && -d "$contracts" ]] || { echo "APEX canonical runtime projection unavailable under $root" >&2; exit 78; }
     exec python3 "$cli" --state-root "$HOME_DIR/.apex/runtime_state" --contract-dir "$contracts" --canonical-commit "$RUNTIME_COMMIT" --compiler-path "$compiler" "$@"
 }
