@@ -3,11 +3,10 @@ name: Final Runtime Proof
 on:
   push:
     branches: [feat/canonical-runtime-projection-v2]
-    paths-ignore: [RUNTIME_PUBLIC_PROOF.json]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   prove:
@@ -108,28 +107,8 @@ jobs:
           assert q['admitted'] is False and q['reason']=='provider_quota'
           assert h['schema']=='glaciereq.runtime-health.v2' and 'slo_evaluation' in h
           PY
-      - name: Persist exact public proof marker
+      - name: Bind proof to exact workflow SHA
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          python - <<'PY'
-          import json,os
-          from datetime import datetime,timezone
-          proof={
-            'schema':'glaciereq.runtime-public-proof.v2',
-            'status':'VERIFIED',
-            'tested_sha':os.environ['GITHUB_SHA'],
-            'canonical_repository':'GlacierEQ/apex-boot-core',
-            'canonical_commit':'84a2907a316327e91dc0426f5407a34908aa4fc4',
-            'proofs':['installer_sync','transparent_semantic_hashes','clean_home_boot','canonical_receipt','replay_attestation','capability_ttl','inventory_truth','resume_cursor','idempotency','governor_context_budget','provider_quota','runtime_health'],
-            'verified_at':datetime.now(timezone.utc).isoformat()
-          }
-          open('RUNTIME_PUBLIC_PROOF.json','w').write(json.dumps(proof,indent=2)+'\n')
-          PY
-          git config user.name glaciereq-runtime-bot
-          git config user.email runtime-bot@users.noreply.github.com
-          git add RUNTIME_PUBLIC_PROOF.json
-          git commit -m 'proof(runtime): persist verified public runtime gate'
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin HEAD:feat/canonical-runtime-projection-v2
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "VERIFIED runtime public proof for $GITHUB_SHA"
