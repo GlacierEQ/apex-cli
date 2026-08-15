@@ -16,8 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feat/canonical-runtime-projection-v2
+          ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - name: Require synchronized public installer
@@ -109,6 +110,8 @@ jobs:
           PY
       - name: Persist exact public proof marker
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
           import json,os
@@ -128,4 +131,5 @@ jobs:
           git config user.email runtime-bot@users.noreply.github.com
           git add RUNTIME_PUBLIC_PROOF.json
           git commit -m 'proof(runtime): persist verified public runtime gate'
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin HEAD:feat/canonical-runtime-projection-v2
