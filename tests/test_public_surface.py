@@ -89,6 +89,9 @@ def test_canonical_semantics_bind_payloads_not_fragment_containers() -> None:
     assert manifest["files"]
     assert all(len(digest) == 64 for digest in manifest["files"].values())
     assert all("git_blob_sha1" not in part for part in manifest["parts"])
+    part_names = [part["name"] for part in manifest["parts"]]
+    assert len(part_names) == len(set(part_names))
+    assert all(name.startswith("source_part_") for name in part_names)
 
 
 def test_paths_module_honors_explicit_environment_root(tmp_path: Path) -> None:
