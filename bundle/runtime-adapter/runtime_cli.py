@@ -30,7 +30,12 @@ def j(value, default):
         is_file = path.is_file()
     except OSError:
         is_file = False
-    return json.loads(path.read_text(encoding="utf-8")) if is_file else json.loads(value)
+    if is_file:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ValueError("json_input_file_unreadable") from exc
+    return json.loads(value)
 
 
 @contextmanager
@@ -85,19 +90,18 @@ def manager(a, paths):
 
 
 def finalize(a, paths):
-    if a.status != "READY":
-        with transaction(paths):
-            return LifecycleEngine(paths).finalize(a.run_id, a.status)
-    receipt = read_json(paths.last_receipt, {})
-    if receipt.get("run_id") != a.run_id or receipt.get("status") != "READY":
-        raise SystemExit("READY requires a persisted READY receipt for the same run")
-    replay = manager(a, paths).replay(paths.last_receipt)
-    if replay.get("status") != "VERIFIED" or not any(
-        item.get("name") == "canonical_commit" and item.get("passed")
-        for item in replay.get("checks", [])
-    ):
-        raise SystemExit("READY requires verified replay attestation against the pinned canonical runtime")
     with transaction(paths):
+        if a.status != "READY":
+            return LifecycleEngine(paths).finalize(a.run_id, a.status)
+        receipt = read_json(paths.last_receipt, {})
+        if receipt.get("run_id") != a.run_id or receipt.get("status") != "READY":
+            raise SystemExit("READY requires a persisted READY receipt for the same run")
+        replay = manager(a, paths).replay(paths.last_receipt)
+        if replay.get("status") != "VERIFIED" or not any(
+            item.get("name") == "canonical_commit" and item.get("passed")
+            for item in replay.get("checks", [])
+        ):
+            raise SystemExit("READY requires verified replay attestation against the pinned canonical runtime")
         return LifecycleEngine(paths).finalize(a.run_id, a.status)
 
 
