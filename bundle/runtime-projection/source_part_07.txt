@@ -1,0 +1,413 @@
+<<<GLACIEREQ_FILE runtime/hardening.py 16649>>>
+#!/usr/bin/env python3
+"""Completion layer for the canonical GlacierEQ runtime kernel v2.
+
+The base compiler holds stable primitives. This module binds the remaining
+admission, inventory, fallback, and attestation invariants without duplicating
+host discovery logic.
+"""
+from __future__ import annotations
+
+import time
+import uuid
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+from runtime.compiler import (
+    FINAL_STATUSES,
+    FALLBACK_CONTRACTS,
+    CapabilityPlane,
+    FallbackGraph,
+    LifecycleEngine,
+    MetricsRecorder,
+    ReceiptManager,
+    ResourceGovernor,
+    RuntimeHealth,
+    RuntimePaths,
+    append_jsonl,
+    atomic_write_json,
+    parse_time,
+    read_json,
+    sha256_file,
+    sha256_json,
+    utc_now,
+)
+
+
+class CapabilityInventory:
+    """Import host-known connector/tool/model identities without inventing liveness."""
+
+    def __init__(self, plane: CapabilityPlane) -> None:
+        self.plane = plane
+
+    def import_inventory(self, inventory: Mapping[str, Any]) -> dict[str, Any]:
+        records = []
+        errors = []
+        for item in inventory.get("capabilities", []):
+            try:
+                capability_id = str(item["capability_id"])
+                kind = str(item["kind"])
+                if kind not in {"connector", "tool", "model", "skill", "runtime", "memory", "service"}:
+                    raise ValueError(f"unsupported kind: {kind}")
+                record = self.plane.register(
+                    capability_id,
+                    kind,
+                    str(item.get("provider", "unknown")),
+                    ttl_seconds=int(item.get("ttl_seconds", 900)),
+                    authorization_scopes=list(item.get("authorization_scopes", [])),
+                    endpoint_ref=item.get("endpoint_ref"),
+                    metadata=dict(item.get("metadata", {})),
+                )
+                probe = item.get("probe")
+                if probe is not None:
+                    checks = {
+                        key: bool(probe.get(key, False))
+                        for key in ("connected", "authenticated", "authorized", "invokable", "verified")
+                    }
+                    record = self.plane.record_probe(
+                        capability_id,
+                        checks,
+                        latency_ms=probe.get("latency_ms"),
+                        error=probe.get("error"),
+                        metadata=probe.get("metadata", {}),
+                    )
+                records.append(record.to_dict())
+            except Exception as exc:
+                errors.append({"capability": item.get("capability_id"), "error": str(exc)})
+        return {
+            "schema": "glaciereq.capability-inventory-import.v2",
+            "status": "VERIFIED" if not errors else "DEGRADED",
+            "imported": records,
+            "errors": errors,
+        }
+
+
+class ContractFallbackGraph(FallbackGraph):
+    """Fallback selection that also enforces edge actions and scopes."""
+
+    def choose(
+        self,
+        source_capability: str,
+        *,
+        action: str = "read",
+        requires_persistence: bool = False,
+        minimum_state: str = "VERIFIED",
+        allow_degraded: bool = True,
+    ) -> dict[str, Any] | None:
+        candidates = [e for e in self.graph.get("edges", []) if e.get("from") == source_capability]
+        for edge in sorted(candidates, key=lambda e: (e.get("priority", 100), e.get("to", ""))):
+            contract = edge.get("contract")
+            if contract not in FALLBACK_CONTRACTS or contract == "forbidden":
+                continue
+            allowed_actions = edge.get("actions")
+            if allowed_actions and action not in allowed_actions:
+                continue
+            if contract == "read_only" and action != "read":
+                continue
+            if contract == "non_persistent" and requires_persistence:
+                continue
+            if contract == "degraded" and not allow_degraded:
+                continue
+            if edge.get("persistent") is False and requires_persistence:
+                continue
+            destination = edge.get("to")
+            if not destination:
+                continue
+            try:
+                if self.plane.eligible(
+                    destination,
+                    minimum_state=minimum_state,
+                    required_scopes=edge.get("required_scopes", []),
+                ):
+                    return dict(edge)
+            except KeyError:
+                continue
+        return None
+
+
+class EconomicResourceGovernor(ResourceGovernor):
+    """Enforce all declared runtime economics at admission time."""
+
+    def __init__(self, paths: RuntimePaths, config: Mapping[str, Any] | None = None) -> None:
+        config = dict(config or {})
+        self.context_budget = int(config.get("context_budget", config.get("token_budget", 200_000)))
+        super().__init__(paths, config)
+
+    def _load(self) -> dict[str, Any]:
+        state = super()._load()
+        state.setdefault("context_tokens_used", 0)
+        return state
+
+    def record_provider_state(
+        self,
+        provider: str,
+        *,
+        quota_remaining: int | None = None,
+        reset_after_seconds: int | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> None:
+        state = self._load()
+        provider_state = state.setdefault("providers", {}).setdefault(provider, {})
+        if quota_remaining is not None:
+            provider_state["quota_remaining"] = int(quota_remaining)
+        if reset_after_seconds is not None:
+            provider_state["quota_reset_at"] = (
+                datetime.now(timezone.utc) + timedelta(seconds=max(0, int(reset_after_seconds)))
+            ).isoformat()
+        if metadata:
+            provider_state.setdefault("metadata", {}).update(dict(metadata))
+        provider_state["updated_at"] = utc_now()
+        self._save(state)
+
+    def acquire(
+        self,
+        *,
+        provider: str,
+        operation: str,
+        estimated_tokens: int = 0,
+        estimated_context_tokens: int = 0,
+        priority: int = 0,
+        run_id: str | None = None,
+        attempt: int = 1,
+    ) -> dict[str, Any]:
+        state = self._load()
+        if int(attempt) > self.config.retry_limit + 1:
+            return {"admitted": False, "reason": "retry_limit", "provider": provider, "attempt": attempt}
+
+        if run_id:
+            run = read_json(self.paths.run(run_id), {})
+            started = parse_time(run.get("started_at"))
+            if started and datetime.now(timezone.utc) > started + timedelta(seconds=self.config.deadline_seconds):
+                return {"admitted": False, "reason": "deadline_exceeded", "provider": provider, "run_id": run_id}
+
+        provider_state = state.setdefault("providers", {}).get(provider, {})
+        quota_remaining = provider_state.get("quota_remaining")
+        quota_reset_at = parse_time(provider_state.get("quota_reset_at"))
+        if quota_remaining is not None and int(quota_remaining) <= 0:
+            if not quota_reset_at or datetime.now(timezone.utc) < quota_reset_at:
+                return {"admitted": False, "reason": "provider_quota", "provider": provider, "quota_remaining": quota_remaining}
+
+        if int(state.get("context_tokens_used", 0)) + int(estimated_context_tokens) > self.context_budget:
+            return {"admitted": False, "reason": "context_budget", "provider": provider}
+
+        decision = super().acquire(
+            provider=provider,
+            operation=operation,
+            estimated_tokens=estimated_tokens,
+            priority=priority,
+            run_id=run_id,
+        )
+        if not decision.get("admitted"):
+            return decision
+
+        lease_id = decision["lease"]["lease_id"]
+        state = self._load()
+        lease = state["leases"][lease_id]
+        lease["attempt"] = int(attempt)
+        lease["estimated_context_tokens"] = int(estimated_context_tokens)
+        state["context_tokens_used"] = int(state.get("context_tokens_used", 0)) + int(estimated_context_tokens)
+        self._save(state)
+        decision["lease"] = lease
+        return decision
+
+    def release(self, lease_id: str, *, actual_tokens: int | None = None, actual_context_tokens: int | None = None) -> bool:
+        state = self._load()
+        lease = state.setdefault("leases", {}).pop(lease_id, None)
+        if not lease:
+            return False
+        if actual_tokens is not None:
+            state["tokens_used"] = max(
+                0,
+                int(state.get("tokens_used", 0))
+                - int(lease.get("estimated_tokens", 0))
+                + int(actual_tokens),
+            )
+        estimated_context = int(lease.get("estimated_context_tokens", 0))
+        state["context_tokens_used"] = max(
+            0,
+            int(state.get("context_tokens_used", 0))
+            - estimated_context
+            + int(actual_context_tokens if actual_context_tokens is not None else estimated_context),
+        )
+        self._save(state)
+        return True
+
+    def snapshot(self) -> dict[str, Any]:
+        state = super().snapshot()
+        state["config"]["context_budget"] = self.context_budget
+        state["context_budget_remaining"] = max(0, self.context_budget - int(state.get("context_tokens_used", 0)))
+        return state
+
+
+class AttestedReceiptManager(ReceiptManager):
+    """Self-contained immutable receipts with explicit canonical attestation."""
+
+    def _journal_snapshot(self) -> dict[str, Any]:
+        return read_json(self.paths.action_index, {"schema": "glaciereq.action-index.v2", "operations": {}})
+
+    def create(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        activation_path: Path | str | None = None,
+        skills: Sequence[Mapping[str, Any]] | None = None,
+        source_predicates: Sequence[Mapping[str, Any]] | None = None,
+        blockers: Sequence[Mapping[str, Any] | str] | None = None,
+        continuation: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if status not in FINAL_STATUSES:
+            raise ValueError(f"invalid receipt status: {status}")
+        run = LifecycleEngine(self.paths).load(run_id)
+        snapshot = CapabilityPlane(self.paths).snapshot()
+        journal_snapshot = self._journal_snapshot()
+        skill_records = []
+        for skill in skills or []:
+            item = dict(skill)
+            path = item.get("path")
+            if path and Path(path).is_file():
+                item["sha256"] = sha256_file(path)
+            skill_records.append(item)
+        activation = None
+        if activation_path:
+            path = Path(activation_path)
+            activation = {
+                "path": str(path),
+                "sha256": sha256_file(path) if path.is_file() else None,
+                "exists": path.is_file(),
+            }
+        receipt_id = uuid.uuid4().hex
+        receipt = {
+            "schema": "glaciereq.runtime-receipt.v2",
+            "receipt_id": receipt_id,
+            "run_id": run_id,
+            "status": status,
+            "objective_sha256": run["objective_sha256"],
+            "runtime": {
+                "canonical_repository": "GlacierEQ/apex-boot-core",
+                "canonical_commit": self.canonical_commit,
+                "compiler_path": str(self.compiler_path),
+                "compiler_sha256": sha256_file(self.compiler_path),
+                "contract_hashes": self.contract_hashes(),
+            },
+            "activation": activation,
+            "skills": skill_records,
+            "capability_snapshot_sha256": sha256_json(snapshot),
+            "capability_snapshot": snapshot,
+            "action_journal_sha256": sha256_json(journal_snapshot),
+            "action_journal_snapshot": journal_snapshot,
+            "source_predicates": [dict(x) for x in (source_predicates or run.get("source_predicates", []))],
+            "blockers": [dict(x) if isinstance(x, Mapping) else {"blocker": str(x)} for x in (blockers or [])],
+            "continuation": dict(
+                continuation
+                or {
+                    "current_stage": run.get("current_stage"),
+                    "completed_stages": run.get("completed_stages", []),
+                    "outstanding_dependencies": run.get("outstanding_dependencies", []),
+                    "cursor": run.get("continuation_cursor", {}),
+                }
+            ),
+            "created_at": utc_now(),
+        }
+        receipt["attestation_payload_sha256"] = sha256_json(receipt)
+        path = self.paths.receipts / f"{receipt_id}.json"
+        atomic_write_json(path, receipt)
+        atomic_write_json(self.paths.last_receipt, receipt)
+        append_jsonl(
+            self.paths.receipt_index,
+            {
+                "receipt_id": receipt_id,
+                "run_id": run_id,
+                "status": status,
+                "path": str(path),
+                "created_at": receipt["created_at"],
+                "sha256": sha256_file(path),
+            },
+        )
+        MetricsRecorder(self.paths).record("receipt_created", 1, {"status": status})
+        return receipt
+
+    def replay(self, receipt_path: Path | str) -> dict[str, Any]:
+        start = time.perf_counter()
+        path = Path(receipt_path)
+        receipt = read_json(path)
+        if not receipt:
+            raise FileNotFoundError(path)
+        checks: list[dict[str, Any]] = []
+
+        def check(name: str, expected: Any, actual: Any) -> None:
+            checks.append({"name": name, "expected": expected, "actual": actual, "passed": expected == actual})
+
+        runtime = receipt.get("runtime", {})
+        check("canonical_repository", "GlacierEQ/apex-boot-core", runtime.get("canonical_repository"))
+        check("canonical_commit", self.canonical_commit, runtime.get("canonical_commit"))
+        check("compiler_sha256", runtime.get("compiler_sha256"), sha256_file(self.compiler_path))
+        current_contracts = self.contract_hashes()
+        for name, expected in runtime.get("contract_hashes", {}).items():
+            check(f"contract:{name}", expected, current_contracts.get(name))
+
+        activation = receipt.get("activation")
+        if activation and activation.get("path"):
+            activation_path = Path(activation["path"])
+            check(
+                "activation_sha256",
+                activation.get("sha256"),
+                sha256_file(activation_path) if activation_path.is_file() else None,
+            )
+        for skill in receipt.get("skills", []):
+            skill_path = Path(skill.get("path", ""))
+            check(
+                f"skill:{skill.get('name')}",
+                skill.get("sha256"),
+                sha256_file(skill_path) if skill_path.is_file() else None,
+            )
+
+        check(
+            "capability_snapshot_sha256",
+            receipt.get("capability_snapshot_sha256"),
+            sha256_json(receipt.get("capability_snapshot", {})),
+        )
+        check(
+            "action_journal_sha256",
+            receipt.get("action_journal_sha256"),
+            sha256_json(receipt.get("action_journal_snapshot", {})),
+        )
+        for predicate in receipt.get("source_predicates", []):
+            self._check_predicate(predicate, checks)
+        run = read_json(self.paths.run(receipt.get("run_id")), {})
+        check("objective_sha256", receipt.get("objective_sha256"), run.get("objective_sha256"))
+
+        payload = dict(receipt)
+        expected_payload_hash = payload.pop("attestation_payload_sha256", None)
+        check("attestation_payload_sha256", expected_payload_hash, sha256_json(payload))
+
+        passed = all(item["passed"] for item in checks)
+        duration = (time.perf_counter() - start) * 1000
+        metrics = MetricsRecorder(self.paths)
+        metrics.record("replay_latency_ms", duration, {"passed": passed})
+        if not passed:
+            metrics.record("verification_failure", 1, {"source": "replay"})
+        return {
+            "schema": "glaciereq.runtime-attestation.v2",
+            "receipt": str(path),
+            "status": "VERIFIED" if passed else "DRIFTED",
+            "checks": checks,
+            "created_at": utc_now(),
+        }
+
+
+class RuntimeHealthV2(RuntimeHealth):
+    def report(self) -> dict[str, Any]:
+        report = super().report()
+        report["governor"] = EconomicResourceGovernor(self.paths).snapshot()
+        return report
+
+
+__all__ = [
+    "AttestedReceiptManager",
+    "CapabilityInventory",
+    "ContractFallbackGraph",
+    "EconomicResourceGovernor",
+    "RuntimeHealthV2",
+]
