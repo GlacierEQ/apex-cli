@@ -35,6 +35,8 @@ def j(value, default):
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError) as exc:
             raise ValueError("json_input_file_unreadable") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError("json_input_file_invalid") from exc
     return json.loads(value)
 
 
