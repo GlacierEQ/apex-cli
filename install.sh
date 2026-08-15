@@ -14,7 +14,7 @@ cleanup_projection_stage() { rm -rf "$PROJECTION_STAGE"; }
 trap cleanup_projection_stage EXIT
 mkdir -p "$PROJECTION_STAGE/scripts"
 python3 - "$SEMANTICS" "$PROJECTION_STAGE" "$CANONICAL_COMMIT" <<'PY'
-import hashlib,json,sys
+import hashlib,json,sys,urllib.error,urllib.request
 from datetime import datetime,timezone
 from pathlib import Path
 manifest_path=Path(sys.argv[1]); dest=Path(sys.argv[2]); commit=sys.argv[3]; meta=json.loads(manifest_path.read_text())
@@ -29,11 +29,22 @@ while True:
     except (ValueError,UnicodeDecodeError): pos+=len(prefix); continue
     if len(payload)==size and rel in expected and hashlib.sha256(payload).hexdigest()==expected[rel]: candidates[rel].append(payload)
     pos=start+max(size,1)
+repo=meta['canonical_repository']
 for rel,digest in expected.items():
     matches=candidates[rel]
+    if len(matches)==0:
+        url=f"https://raw.githubusercontent.com/{repo}/{commit}/{rel}"
+        try:
+            with urllib.request.urlopen(url,timeout=30) as response:
+                payload=response.read(8_000_001)
+        except (OSError,urllib.error.URLError) as exc:
+            raise SystemExit(f'canonical source unavailable: {rel}: {type(exc).__name__}') from exc
+        if len(payload)>8_000_000: raise SystemExit(f'canonical source over limit: {rel}')
+        if hashlib.sha256(payload).hexdigest()!=digest: raise SystemExit(f'canonical source digest mismatch: {rel}')
+        matches=[payload]
     if len(matches)!=1: raise SystemExit(f'canonical payload cardinality mismatch: {rel} matches={len(matches)}')
     target=dest/rel; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(matches[0])
-projection={'schema':'glaciereq.runtime-projection.v2','canonical_repository':meta['canonical_repository'],'canonical_commit':commit,'files':expected,'generated_at':datetime.now(timezone.utc).isoformat(),'projection_law':'Only the unique payload matching each pinned canonical SHA-256 is materialized; transport framing and nonmatching historical records have no authority.'}; (dest/'RUNTIME_PROJECTION.json').write_text(json.dumps(projection,indent=2,sort_keys=True)+'\n')
+projection={'schema':'glaciereq.runtime-projection.v2','canonical_repository':meta['canonical_repository'],'canonical_commit':commit,'files':expected,'generated_at':datetime.now(timezone.utc).isoformat(),'projection_law':'Prefer unique locally bundled payloads matching pinned SHA-256; when a local payload is absent, recover only from the exact pinned canonical GitHub commit and require the same pinned digest before materialization.'}; (dest/'RUNTIME_PROJECTION.json').write_text(json.dumps(projection,indent=2,sort_keys=True)+'\n')
 PY
 cp "$ADAPTER_DIR/runtime_cli.py" "$PROJECTION_STAGE/scripts/runtime_cli.py"; cp "$ADAPTER_DIR/verify_projection.py" "$PROJECTION_STAGE/scripts/verify_runtime_projection.py"; chmod +x "$PROJECTION_STAGE/scripts/"*.py
 python3 "$PROJECTION_STAGE/scripts/verify_runtime_projection.py" --root "$PROJECTION_STAGE" --expect-commit "$CANONICAL_COMMIT" >/dev/null
