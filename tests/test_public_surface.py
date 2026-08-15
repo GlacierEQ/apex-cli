@@ -44,7 +44,11 @@ def test_concurrent_action_begin_reuses_one_operation(tmp_path: Path) -> None:
     assert p1.returncode==0,err1; assert p2.returncode==0,err2
     a=json.loads(out1); b=json.loads(out2)
     assert a['operation_id']==b['operation_id']
-    assert {bool(a.get('must_not_repeat')),bool(b.get('must_not_repeat'))}=={False,True}
+    assert {bool(a.get('reused')),bool(b.get('reused'))}=={False,True}
+    assert a['status']=='PENDING' and b['status']=='PENDING'
+    reused = a if a.get('reused') else b
+    assert reused.get('requires_reconciliation') is True
+    assert bool(a.get('must_not_repeat')) is False and bool(b.get('must_not_repeat')) is False
 
 def test_external_casebuild_harness_has_no_implicit_device_paths() -> None:
     source=(ROOT/'tests'/'test_end_to_end_casebuild.py').read_text(encoding='utf-8'); assert '/data/data/com.termux/' not in source; assert 'APEX_CASEBUILDER_ROOT' in source; assert 'APEX_RED_HELIX_ROOT' in source; assert 'TemporaryDirectory' in source; assert 'if __name__ == "__main__"' in source
