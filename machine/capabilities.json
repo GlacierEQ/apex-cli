@@ -10,7 +10,8 @@
     "capability-ttl-and-eligibility-evaluation",
     "resource-governor-denial-and-provider-quota-state",
     "runtime-health-readback",
-    "composition-receipt-separation"
+    "composition-receipt-separation",
+    "apex-mass-recovery-enrolled"
   ],
   "canonical_runtime_authority": {
     "repository": "GlacierEQ/apex-boot-core",
@@ -22,5 +23,28 @@
   "dropbox_or_device_runtime_proven": false,
   "live_mcp_apex_mesh_integration_claim": false,
   "performance_or_scale_claim": false,
-  "note": "Capabilities are bounded to repository-local installation, verification, runtime semantics, and readback proven by the current PR proof surface. No external provider, production, scale, or device authority is implied."
+  "note": "Capabilities are bounded to repository-local installation, verification, runtime semantics, and readback proven by the current PR proof surface. No external provider, production, scale, or device authority is implied.",
+  "recovery": {
+    "identity": "APEX_IS_THE_COUNTER_TO_CANONICAL_DESTRUCTION",
+    "law": "MAXIMUM_COHERENT_ADVANCE",
+    "program": "mass-job-repo-recovery",
+    "dual_plane": true
+  },
+  "planes": {
+    "verified": [
+      "repository-local-bash-command-dispatch",
+      "pinned-sha256-canonical-runtime-projection",
+      "fresh-install-canonical-runtime-bootstrap-and-status",
+      "runtime-receipt-replay-and-attestation",
+      "resumable-lifecycle-cursor",
+      "idempotent-action-journal",
+      "capability-ttl-and-eligibility-evaluation",
+      "resource-governor-denial-and-provider-quota-state",
+      "runtime-health-readback",
+      "composition-receipt-separation"
+    ],
+    "implemented": [
+      "apex-mass-recovery-enrolled"
+    ]
+  }
 }
