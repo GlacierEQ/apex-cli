@@ -37,8 +37,12 @@ def _resolve(env_key: str, config_key: str, default: str) -> Path:
 
 BASE_DIR = _resolve("APEX_BASE_DIR", "base_dir", str(Path.home() / "automation"))
 TASKLET_DIR = _resolve("APEX_TASKLET_DIR", "tasklet_dir", str(BASE_DIR / "tasklet"))
-WORKSPACE_DIR = _resolve("APEX_WORKSPACE_DIR", "workspace_dir", str(TASKLET_DIR / "workspace" / "home"))
-TMP_DIR = _resolve("APEX_TMP_DIR", "tmp_dir", str(Path.home() / ".local" / "share" / "tmp"))
+WORKSPACE_DIR = _resolve(
+    "APEX_WORKSPACE_DIR", "workspace_dir", str(TASKLET_DIR / "workspace" / "home")
+)
+TMP_DIR = _resolve(
+    "APEX_TMP_DIR", "tmp_dir", str(Path.home() / ".local" / "share" / "tmp")
+)
 
 # ─── Skill Output Paths ─────────────────────────────────────────────────────
 
@@ -55,18 +59,30 @@ PIPELINE_REPORTS_DIR = TASKLET_DIR / "pipeline-reports"
 
 # ─── Config Files ────────────────────────────────────────────────────────────
 
-CONNECTIONS_FILE = _resolve("APEX_CONNECTIONS_FILE", "connections_file", str(Path.home() / ".apex" / "connections.json"))
+CONNECTIONS_FILE = _resolve(
+    "APEX_CONNECTIONS_FILE",
+    "connections_file",
+    str(Path.home() / ".apex" / "connections.json"),
+)
 SESSION_DIR = TASKLET_DIR / "sessions"
 COOKIES_DIR = SESSION_DIR / "cookies"
 
 # ─── Ensure directories exist ────────────────────────────────────────────────
 
 ALL_DIRS = [
-    TASKLET_DIR, WORKSPACE_DIR, TMP_DIR,
-    GMAIL_DIR, GMAIL_FORENSIC_DIR, GMAIL_DRAFTS_DIR,
-    VOICE_MEMOS_DIR, VOICE_MEMOS_PROCESSED,
-    CATACLYSM_DIR, NOTION_QUEUE_DIR, PIPELINE_REPORTS_DIR,
-    SESSION_DIR, COOKIES_DIR,
+    TASKLET_DIR,
+    WORKSPACE_DIR,
+    TMP_DIR,
+    GMAIL_DIR,
+    GMAIL_FORENSIC_DIR,
+    GMAIL_DRAFTS_DIR,
+    VOICE_MEMOS_DIR,
+    VOICE_MEMOS_PROCESSED,
+    CATACLYSM_DIR,
+    NOTION_QUEUE_DIR,
+    PIPELINE_REPORTS_DIR,
+    SESSION_DIR,
+    COOKIES_DIR,
 ]
 
 
@@ -81,6 +97,7 @@ ensure_dirs()
 
 
 # ─── Credential Loader ──────────────────────────────────────────────────────
+
 
 def load_credentials(service: str, account: str = "") -> dict:
     """

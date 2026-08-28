@@ -6,6 +6,7 @@ harness is invoked, so normal test collection does not pretend those sibling
 systems are present or connected. All generated integration state is isolated in
 a per-run temporary workspace and removed automatically.
 """
+
 from __future__ import annotations
 
 import os
@@ -17,7 +18,9 @@ from pathlib import Path
 def _required_root(env_name: str) -> Path:
     value = os.environ.get(env_name)
     if not value:
-        raise RuntimeError(f"{env_name} is required for the external integration harness")
+        raise RuntimeError(
+            f"{env_name} is required for the external integration harness"
+        )
     root = Path(value).expanduser().resolve()
     if not root.is_dir():
         raise RuntimeError(f"{env_name} does not resolve to a directory: {root}")

@@ -14,7 +14,6 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
 
 HOME = Path(os.environ.get("HOME", "/home/droid"))
 # Repo root: scripts/.. or bundle/scripts/../..
@@ -22,13 +21,20 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 APEX_CLI_ROOT = Path(
     os.environ.get(
         "APEX_CLI_ROOT",
-        str(_SCRIPT_DIR.parent if (_SCRIPT_DIR / "establish_neural_link.py").name else _SCRIPT_DIR),
+        str(
+            _SCRIPT_DIR.parent
+            if (_SCRIPT_DIR / "establish_neural_link.py").name
+            else _SCRIPT_DIR
+        ),
     )
 )
 # Prefer apex-cli checkout as PYTHONPATH root for servers.synthesizer
-if (_SCRIPT_DIR.name == "scripts" and (_SCRIPT_DIR.parent / "servers" / "synthesizer").is_dir()):
+if (
+    _SCRIPT_DIR.name == "scripts"
+    and (_SCRIPT_DIR.parent / "servers" / "synthesizer").is_dir()
+):
     APEX_CLI_ROOT = _SCRIPT_DIR.parent
-elif (_SCRIPT_DIR.name == "scripts" and _SCRIPT_DIR.parent.name == "bundle"):
+elif _SCRIPT_DIR.name == "scripts" and _SCRIPT_DIR.parent.name == "bundle":
     APEX_CLI_ROOT = _SCRIPT_DIR.parent.parent
 
 LOCUS = os.environ.get("SYNTHESIZER_LOCUS", "http://localhost:8000")
@@ -127,15 +133,32 @@ def ensure_locus(start: bool = True) -> bool:
     py = str(VENV_PYTHON if VENV_PYTHON.is_file() else sys.executable)
     # Prefer apex-cli servers package; fall back to $HOME/servers
     roots = [APEX_CLI_ROOT, HOME]
-    root = next((r for r in roots if (r / "servers" / "synthesizer" / "main.py").is_file()), HOME)
+    root = next(
+        (r for r in roots if (r / "servers" / "synthesizer" / "main.py").is_file()),
+        HOME,
+    )
     env = {
         **os.environ,
-        "PYTHONPATH": str(root) + (os.pathsep + os.environ["PYTHONPATH"] if os.environ.get("PYTHONPATH") else ""),
+        "PYTHONPATH": str(root)
+        + (
+            os.pathsep + os.environ["PYTHONPATH"]
+            if os.environ.get("PYTHONPATH")
+            else ""
+        ),
         "CASE_ID": CASE_ID,
         "APEX_CLI_ROOT": str(root),
     }
     subprocess.Popen(
-        [py, "-m", "uvicorn", "servers.synthesizer.main:app", "--host", "0.0.0.0", "--port", "8000"],
+        [
+            py,
+            "-m",
+            "uvicorn",
+            "servers.synthesizer.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+        ],
         cwd=str(root),
         env=env,
         stdout=log.open("a"),
@@ -213,7 +236,12 @@ def maximize_for_steward() -> int:
                     "steward_inbox",
                     "sanctuary",
                 ],
-                "aka": ["Microwave", "Microwave-Juggernaut", "Omni", "Omni-AKA-Microwave"],
+                "aka": [
+                    "Microwave",
+                    "Microwave-Juggernaut",
+                    "Omni",
+                    "Omni-AKA-Microwave",
+                ],
                 "case_id": CASE_ID,
                 "meta": {"profile": "coremaximized", "token_mode": "v2"},
             },
@@ -294,7 +322,9 @@ def maximize_for_steward() -> int:
 
     code, ctx = _http("GET", f"{LOCUS.rstrip('/')}/steward/context")
     if code == 200 and isinstance(ctx, dict):
-        print(f"\n>>> [STEWARD CONTEXT] est_tokens={ctx.get('est_tokens')} agents={list(ctx.get('agents', {}))}")
+        print(
+            f"\n>>> [STEWARD CONTEXT] est_tokens={ctx.get('est_tokens')} agents={list(ctx.get('agents', {}))}"
+        )
     else:
         failures += 1
 
@@ -315,8 +345,12 @@ def main() -> int:
     ap.add_argument("--directive", default="INITIATE_NEURAL_LINK")
     ap.add_argument("--payload-json", default=None)
     ap.add_argument("--sigil", default=MICROWAVE_AUTH_SIGIL)
-    ap.add_argument("--maximize", action="store_true", help="Full steward maximize path")
-    ap.add_argument("--ensure-locus", action="store_true", help="Auto-start :8000 if down")
+    ap.add_argument(
+        "--maximize", action="store_true", help="Full steward maximize path"
+    )
+    ap.add_argument(
+        "--ensure-locus", action="store_true", help="Auto-start :8000 if down"
+    )
     ap.add_argument("--status", action="store_true", help="Print locus health + links")
     ap.add_argument("--brief", action="store_true", help="Fetch steward brief")
     ap.add_argument("--context", action="store_true", help="Fetch steward context card")

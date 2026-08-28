@@ -29,12 +29,14 @@ def _load_env() -> None:
 
 
 def _refresh(client_id: str, client_secret: str, refresh_token: str) -> dict:
-    body = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }).encode()
+    body = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+    ).encode()
     req = urllib.request.Request(
         OAUTH_URL,
         data=body,
@@ -124,16 +126,22 @@ def main() -> int:
             )
             GATE.write_text(text, encoding="utf-8")
         account = _verify(access)
-        print(json.dumps({
-            "ok": True,
-            "source": "rclone",
-            "account": account.get("email", "unknown"),
-            "expires_in": payload["expires_in"],
-        }))
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "source": "rclone",
+                    "account": account.get("email", "unknown"),
+                    "expires_in": payload["expires_in"],
+                }
+            )
+        )
         return 0
 
     client_id = os.environ.get("DROPBOX_APP_KEY") or os.environ.get("DROPBOX_KEY", "")
-    client_secret = os.environ.get("DROPBOX_APP_SECRET") or os.environ.get("DROPBOX_SECRET", "")
+    client_secret = os.environ.get("DROPBOX_APP_SECRET") or os.environ.get(
+        "DROPBOX_SECRET", ""
+    )
     refresh = os.environ.get("DROPBOX_REFRESH_TOKEN", "")
 
     if TOKEN_PATH.is_file():
@@ -154,7 +162,9 @@ def main() -> int:
         if blob and blob.get("access_token"):
             sys.argv.append("--from-rclone")
             return main()
-        print(json.dumps({"ok": False, "error": "refresh_failed_and_no_rclone_fallback"}))
+        print(
+            json.dumps({"ok": False, "error": "refresh_failed_and_no_rclone_fallback"})
+        )
         return 1
 
     access = tokens.get("access_token", "")
@@ -177,13 +187,17 @@ def main() -> int:
         account = _verify(access)
         email = account.get("email", "unknown")
         name = account.get("name", {}).get("display_name", "")
-        print(json.dumps({
-            "ok": True,
-            "account": email,
-            "display_name": name,
-            "token_path": str(TOKEN_PATH),
-            "expires_in": payload["expires_in"],
-        }))
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "account": email,
+                    "display_name": name,
+                    "token_path": str(TOKEN_PATH),
+                    "expires_in": payload["expires_in"],
+                }
+            )
+        )
         return 0
     except Exception as e:
         print(json.dumps({"ok": False, "error": f"verify_failed: {str(e)[:200]}"}))

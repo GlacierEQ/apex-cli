@@ -11,7 +11,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -95,11 +94,47 @@ def build_workflow_router() -> dict:
         "at": _now(),
         "profile": "coremaximized",
         "phases": [
-            {"id": "boot", "actions": ["read AGENT_BOOT.md", "sm-ops prime", "gatekeeper agent_boot"], "parallel": False},
-            {"id": "plan", "actions": ["gap analysis", "read POINTER_INDEX", "skills_router for task type"], "parallel": True},
-            {"id": "execute", "actions": ["batch tool calls", "colossus gate before risky writes", "helix one-big-push"], "parallel": True},
-            {"id": "verify", "actions": ["read back changes", "guard_signal9 if spawning procs", "token_stats"], "parallel": True},
-            {"id": "save", "actions": ["sm-ops save --durable", "memory_layer_status"], "parallel": False},
+            {
+                "id": "boot",
+                "actions": [
+                    "read AGENT_BOOT.md",
+                    "sm-ops prime",
+                    "gatekeeper agent_boot",
+                ],
+                "parallel": False,
+            },
+            {
+                "id": "plan",
+                "actions": [
+                    "gap analysis",
+                    "read POINTER_INDEX",
+                    "skills_router for task type",
+                ],
+                "parallel": True,
+            },
+            {
+                "id": "execute",
+                "actions": [
+                    "batch tool calls",
+                    "colossus gate before risky writes",
+                    "helix one-big-push",
+                ],
+                "parallel": True,
+            },
+            {
+                "id": "verify",
+                "actions": [
+                    "read back changes",
+                    "guard_signal9 if spawning procs",
+                    "token_stats",
+                ],
+                "parallel": True,
+            },
+            {
+                "id": "save",
+                "actions": ["sm-ops save --durable", "memory_layer_status"],
+                "parallel": False,
+            },
         ],
         "task_routing": {
             "coding": ["helix-pro-code", "token-savings", "hyper-efficiency-flow"],
@@ -157,7 +192,10 @@ def build_pointer_index() -> dict:
             "by_actor": str(CASE_ROOT / "EVIDENCE/BY_ACTOR"),
             "keep_registry": str(HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep"),
             "gatekeeper_env": str(HOME / ".operator_key_vault/gatekeeper.env"),
-            "ag_cli_index": str(HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/AG_CLI_ENVIRONMENT_INDEX.md"),
+            "ag_cli_index": str(
+                HOME
+                / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/AG_CLI_ENVIRONMENT_INDEX.md"
+            ),
             "app_catalog": str(HOME / "MISSIONS/APP_CATALOG/MANIFEST.md"),
             "grok_config": str(HOME / ".grok/config.toml"),
         },
@@ -212,7 +250,9 @@ def _vault_summary() -> dict:
         return {"keys": 0}
 
 
-def build_agent_boot(pointer: dict, helix: dict, vault: dict, prime_used: int = 0) -> tuple[dict, str]:
+def build_agent_boot(
+    pointer: dict, helix: dict, vault: dict, prime_used: int = 0
+) -> tuple[dict, str]:
     payload = {
         "at": _now(),
         "profile": "coremaximized",
@@ -239,43 +279,49 @@ def build_agent_boot(pointer: dict, helix: dict, vault: dict, prime_used: int = 
     for need, route in pointer["mcp_routing"].items():
         lines.append(f"| {need} | {route} |")
 
-    lines.extend([
-        "",
-        "## Hot paths",
-        "",
-        "| Resource | Path |",
-        "|----------|------|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Hot paths",
+            "",
+            "| Resource | Path |",
+            "|----------|------|",
+        ]
+    )
     for name, path in pointer["paths"].items():
         lines.append(f"| {name} | `{path}` |")
 
-    lines.extend([
-        "",
-        "## Token discipline",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Token discipline",
+            "",
+        ]
+    )
     for rule in pointer["token_discipline"]:
         lines.append(f"- {rule}")
 
-    lines.extend([
-        "",
-        "## Workflow (5 phases)",
-        "",
-        "boot → plan → execute → verify → save",
-        "",
-        f"Full router: `{WORKFLOW_ROUTER}`",
-        "",
-        "## Commands",
-        "",
-        "```bash",
-        'sm-ops prime "current task" --max-tokens 1000',
-        "sm-ops save \"outcome\" --durable",
-        "sm-ops maximize",
-        "sm-ops fs-commander --activate",
-        "```",
-        "",
-        f"*Generated {_now()[:19]}Z*",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Workflow (5 phases)",
+            "",
+            "boot → plan → execute → verify → save",
+            "",
+            f"Full router: `{WORKFLOW_ROUTER}`",
+            "",
+            "## Commands",
+            "",
+            "```bash",
+            'sm-ops prime "current task" --max-tokens 1000',
+            'sm-ops save "outcome" --durable',
+            "sm-ops maximize",
+            "sm-ops fs-commander --activate",
+            "```",
+            "",
+            f"*Generated {_now()[:19]}Z*",
+        ]
+    )
 
     return payload, "\n".join(lines) + "\n"
 
@@ -352,7 +398,9 @@ def maximize_skills() -> dict:
     router = {
         "at": _now(),
         "total": len(skills),
-        "primary_gemini": sum(1 for s in skills if s["source"] == "gemini" and s["primary"]),
+        "primary_gemini": sum(
+            1 for s in skills if s["source"] == "gemini" and s["primary"]
+        ),
         "routing": {
             "token_savings": "token-savings",
             "memory_ops": "memory-connect | unified-memory-connect | sm-ops",
@@ -484,7 +532,11 @@ def patch_grok_config() -> dict:
         str(GEMINI_SKILLS),
         str(GROK_SKILLS),
     ]
-    block = "[skills]\npaths = [\n" + "\n".join(f'  "{p}",' for p in desired) + "\n]\ndisabled = []"
+    block = (
+        "[skills]\npaths = [\n"
+        + "\n".join(f'  "{p}",' for p in desired)
+        + "\n]\ndisabled = []"
+    )
     changed = False
     if "[skills]" in text:
         new_text = re.sub(
@@ -519,13 +571,23 @@ def main() -> int:
     import argparse
 
     ap = argparse.ArgumentParser(description="APEX agentic + token savings maximize")
-    ap.add_argument("--quick", action="store_true", help="Skip helix boot (keys + prime only)")
-    ap.add_argument("--query", default=DEFAULT_PRIME_QUERY, help="Prime query for live-context")
-    ap.add_argument("--max-tokens", type=int, default=1000, help="Prime budget (default 1000)")
+    ap.add_argument(
+        "--quick", action="store_true", help="Skip helix boot (keys + prime only)"
+    )
+    ap.add_argument(
+        "--query", default=DEFAULT_PRIME_QUERY, help="Prime query for live-context"
+    )
+    ap.add_argument(
+        "--max-tokens", type=int, default=1000, help="Prime budget (default 1000)"
+    )
     ap.add_argument("--skip-keys", action="store_true", help="Skip prime-keys")
     ap.add_argument("--skip-prime", action="store_true", help="Skip sm-ops prime")
-    ap.add_argument("--skip-skills", action="store_true", help="Skip skills index + symlinks")
-    ap.add_argument("--skip-connectors", action="store_true", help="Skip connector mesh audit")
+    ap.add_argument(
+        "--skip-skills", action="store_true", help="Skip skills index + symlinks"
+    )
+    ap.add_argument(
+        "--skip-connectors", action="store_true", help="Skip connector mesh audit"
+    )
     args = ap.parse_args()
 
     print("=" * 56)
@@ -537,13 +599,19 @@ def main() -> int:
 
     if not args.skip_keys:
         print("\n[keys] consolidating vault...")
-        code, out = _run(["python3", str(HOME / "scripts/consolidate_operator_keys.py")], timeout=120)
+        code, out = _run(
+            ["python3", str(HOME / "scripts/consolidate_operator_keys.py")], timeout=120
+        )
         steps.append({"step": "prime_keys", "ok": code == 0})
-        print(f"  {'OK' if code == 0 else 'WARN'}: {out.splitlines()[-1] if out else 'no output'}")
+        print(
+            f"  {'OK' if code == 0 else 'WARN'}: {out.splitlines()[-1] if out else 'no output'}"
+        )
 
     if not args.quick:
         print("\n[helix] alpha+omega maximize...")
-        code, out = _run(["python3", str(HOME / "scripts/apex_helix_maximize.py")], timeout=300)
+        code, out = _run(
+            ["python3", str(HOME / "scripts/apex_helix_maximize.py")], timeout=300
+        )
         steps.append({"step": "helix_maximize", "ok": code == 0})
         print(f"  {'OK' if code == 0 else 'WARN'}: helix boot")
     else:
@@ -561,9 +629,18 @@ def main() -> int:
     if not args.skip_connectors:
         print("\n[connectors] MCP mesh audit...")
         conn = maximize_connectors()
-        steps.append({"step": "connectors", "ok": conn.get("ok", False), "grok": conn["grok"], "gemini": conn["gemini"]})
+        steps.append(
+            {
+                "step": "connectors",
+                "ok": conn.get("ok", False),
+                "grok": conn["grok"],
+                "gemini": conn["gemini"],
+            }
+        )
         tag = "OK" if conn.get("ok") else "WARN"
-        print(f"  {tag}: grok={conn['grok']} gemini={conn['gemini']} → {CONNECTOR_MESH}")
+        print(
+            f"  {tag}: grok={conn['grok']} gemini={conn['gemini']} → {CONNECTOR_MESH}"
+        )
 
     print("\n[workflow] building execution router...")
     workflow = build_workflow_router()
@@ -588,7 +665,9 @@ def main() -> int:
         mem_ok = mem_result.get("prime", {}).get("ok", False)
         steps.append({"step": "memory", "ok": mem_ok, "tokens": prime_used})
         layers = mem_result.get("layers", {})
-        print(f"  {'OK' if mem_ok else 'WARN'}: {prime_used}t | mem0={layers.get('mem0_key')} sm={layers.get('supermemory_key')}")
+        print(
+            f"  {'OK' if mem_ok else 'WARN'}: {prime_used}t | mem0={layers.get('mem0_key')} sm={layers.get('supermemory_key')}"
+        )
 
     boot_json, boot_md = build_agent_boot(pointer, helix, vault, prime_used)
     BOOT_JSON.write_text(json.dumps(boot_json, indent=2) + "\n")
@@ -596,7 +675,12 @@ def main() -> int:
 
     print("\n[optimizer] skill/connectors...")
     opt_result = run_optimizer_scan()
-    steps.append({"step": "optimizer", "ok": opt_result.get("ok", opt_result.get("skipped", False))})
+    steps.append(
+        {
+            "step": "optimizer",
+            "ok": opt_result.get("ok", opt_result.get("skipped", False)),
+        }
+    )
 
     status = {
         "at": _now(),

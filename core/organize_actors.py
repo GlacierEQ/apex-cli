@@ -24,10 +24,17 @@ import httpx
 HOME = Path(os.environ.get("HOME", "/data/data/com.termux/files/home"))
 BY_ACTOR = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/EVIDENCE/BY_ACTOR"
 ACTORS_PLANS = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/ACTORS"
-ORGANIZED_MD = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/MEM0_ACTIVE_CONTEXT_ORGANIZED.md"
-PORTFOLIOS = HOME / "MISSIONS/AEON_777/Pro-AEON-777/1FDV-23-0001009_MASTER/ACTOR_PORTFOLIOS"
+ORGANIZED_MD = (
+    HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/MEM0_ACTIVE_CONTEXT_ORGANIZED.md"
+)
+PORTFOLIOS = (
+    HOME / "MISSIONS/AEON_777/Pro-AEON-777/1FDV-23-0001009_MASTER/ACTOR_PORTFOLIOS"
+)
 STATE_PATH = HOME / ".supermemory/ops/actor-organize-state.json"
-VAULT = HOME / "MISSIONS/AEON_777/CORE_MISSION/AEON-BRAIN-777/02_EVIDENCE_VAULT/CONSOLIDATED_ARCHIVE"
+VAULT = (
+    HOME
+    / "MISSIONS/AEON_777/CORE_MISSION/AEON-BRAIN-777/02_EVIDENCE_VAULT/CONSOLIDATED_ARCHIVE"
+)
 
 ARCHIVE_BY_ACTOR_SOURCES = [
     VAULT / "FINAL_FEDERAL_STRIKE_PACKAGE/EVIDENCE/BY_ACTOR",
@@ -43,27 +50,60 @@ ARCHIVE_SKIP_DIRS = {"00_INGEST", ".git", "__pycache__"}
 ACTOR_REGISTRY: dict[str, dict] = {
     "Teresa": {
         "name": "Teresa Del Carpio",
-        "keywords": ["teresa", "del carpio", "exh-a-01-teresa", "petitioner", "plaintiff motion"],
+        "keywords": [
+            "teresa",
+            "del carpio",
+            "exh-a-01-teresa",
+            "petitioner",
+            "plaintiff motion",
+        ],
         "portfolio": "TERESA_DEL_CARPIO",
         "plans": ["01_TERESA", "TERESA_DEL_CARPIO", "DISMANTLE_TERESA"],
     },
     "Brower": {
         "name": "Scot Brower",
-        "keywords": ["brower", "scot brower", "scot stuart brower", "odc breach", "odc confidentiality", "opposing counsel"],
+        "keywords": [
+            "brower",
+            "scot brower",
+            "scot stuart brower",
+            "odc breach",
+            "odc confidentiality",
+            "opposing counsel",
+        ],
         "portfolio": "BROWER_SCOT",
         "plans": ["02_BROWER", "BROWER", "SCOT_BROWER", "SCOT_STUART", "STRIKE_02"],
     },
     "Naso": {
         "name": "Judge Courtney Naso",
-        "keywords": ["naso", "courtney naso", "judge naso", "plan_03_judge_naso", "smash_04"],
+        "keywords": [
+            "naso",
+            "courtney naso",
+            "judge naso",
+            "plan_03_judge_naso",
+            "smash_04",
+        ],
         "portfolio": "JUDGE_COURTNEY_NASO",
         "plans": ["03_JUDGE_NASO", "NASO", "COURTNEY_NASO"],
     },
     "Shaw": {
         "name": "Judge Natasha Shaw",
-        "keywords": ["natasha shaw", "judge shaw", "shaw coordination", "brower-shaw", "brower‑shaw", "100% denial", "ruling pattern"],
+        "keywords": [
+            "natasha shaw",
+            "judge shaw",
+            "shaw coordination",
+            "brower-shaw",
+            "brower‑shaw",
+            "100% denial",
+            "ruling pattern",
+        ],
         "portfolio": "JUDGE_NATASHA_SHAW",
-        "plans": ["04_JUDGE_SHAW", "JUDGE_NATASHA_SHAW", "SMASH_03_JUDGE_NATASHA", "SHAW", "NATASHA_SHAW"],
+        "plans": [
+            "04_JUDGE_SHAW",
+            "JUDGE_NATASHA_SHAW",
+            "SMASH_03_JUDGE_NATASHA",
+            "SHAW",
+            "NATASHA_SHAW",
+        ],
     },
     "Park": {
         "name": "Judge Andrew Park",
@@ -91,19 +131,36 @@ ACTOR_REGISTRY: dict[str, dict] = {
     },
     "PACT": {
         "name": "PACT Services",
-        "keywords": ["pact services", "through pact", "supervised visitation", "plan_08_pact", "smash_11_pact"],
+        "keywords": [
+            "pact services",
+            "through pact",
+            "supervised visitation",
+            "plan_08_pact",
+            "smash_11_pact",
+        ],
         "portfolio": "PACT_SERVICES",
         "plans": ["08_PACT", "PACT", "DISMANTLE_PACT"],
     },
     "HPD": {
         "name": "HPD Department",
-        "keywords": ["hpd department", "honolulu police", "police escort", "plan_09_hpd", "smash_08_hpd"],
+        "keywords": [
+            "hpd department",
+            "honolulu police",
+            "police escort",
+            "plan_09_hpd",
+            "smash_08_hpd",
+        ],
         "portfolio": "HPD_DEPARTMENT",
         "plans": ["09_HPD", "HPD"],
     },
     "Yamatani": {
         "name": "Micky Yamatani",
-        "keywords": ["yamatani", "micky yamatani", "plan_11_yamatani", "smash_12_micky"],
+        "keywords": [
+            "yamatani",
+            "micky yamatani",
+            "plan_11_yamatani",
+            "smash_12_micky",
+        ],
         "portfolio": "MICKY_YAMATANI",
         "plans": ["11_YAMATANI", "YAMATANI", "MICKY"],
     },
@@ -115,13 +172,23 @@ ACTOR_REGISTRY: dict[str, dict] = {
     },
     "Castillo": {
         "name": "Clerk Castillo",
-        "keywords": ["clerk castillo", "castillo", "plan_12_clerk_castillo", "smash_05_clerk_castillo"],
+        "keywords": [
+            "clerk castillo",
+            "castillo",
+            "plan_12_clerk_castillo",
+            "smash_05_clerk_castillo",
+        ],
         "portfolio": "CLERK_CASTILLO",
         "plans": ["12_CLERK_CASTILLO", "CASTILLO", "CLERK_CASTILLO"],
     },
     "Le": {
         "name": "Clerk Le",
-        "keywords": ["clerk le", "smash_06_clerk_le", "plan_13_clerk_le", "court clerk coordination"],
+        "keywords": [
+            "clerk le",
+            "smash_06_clerk_le",
+            "plan_13_clerk_le",
+            "court clerk coordination",
+        ],
         "portfolio": "CLERK_LE",
         "plans": ["13_CLERK_LE", "CLERK_LE", "SMASH_06_CLERK_LE"],
     },
@@ -133,7 +200,11 @@ ACTOR_REGISTRY: dict[str, dict] = {
     },
     "Unemployment": {
         "name": "Unemployment Agency",
-        "keywords": ["unemployment agency", "plan_16_unemployment", "smash_16_unemployment"],
+        "keywords": [
+            "unemployment agency",
+            "plan_16_unemployment",
+            "smash_16_unemployment",
+        ],
         "portfolio": "UNEMPLOYMENT_AGENCY",
         "plans": ["16_UNEMPLOYMENT", "UNEMPLOYMENT"],
     },
@@ -169,7 +240,14 @@ ACTOR_REGISTRY: dict[str, dict] = {
     },
     "Kekoa": {
         "name": "Kekoa Barton",
-        "keywords": ["kekoa", "kekoa barton", "victim node", "smash_22_kekoa", "barton v casey", "1fda"],
+        "keywords": [
+            "kekoa",
+            "kekoa barton",
+            "victim node",
+            "smash_22_kekoa",
+            "barton v casey",
+            "1fda",
+        ],
         "portfolio": "KEKOA_BARTON",
         "plans": ["22_KEKOA", "KEKOA", "KEKOA_BARTON"],
     },
@@ -190,24 +268,33 @@ ACTOR_REGISTRY: dict[str, dict] = {
 # High-value reference docs → symlink into actor EVIDENCE/references/
 REFERENCE_LINKS: dict[str, list[Path]] = {
     "Brower": [
-        HOME / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/background/investigations/SCOT_BROWER_INVESTIGATIVE_REPORT.md",
-        HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/ACTORS/CONTINGENCY_COMPLETE_PER_ACTOR_STRATEGY.md",
-        HOME / "MISSIONS/APEX_INFRASTRUCTURE/aspen-grove-operator-v7/research/intelligence/actors/brower_complete_profile.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/background/investigations/SCOT_BROWER_INVESTIGATIVE_REPORT.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/ACTORS/CONTINGENCY_COMPLETE_PER_ACTOR_STRATEGY.md",
+        HOME
+        / "MISSIONS/APEX_INFRASTRUCTURE/aspen-grove-operator-v7/research/intelligence/actors/brower_complete_profile.md",
     ],
     "Yamatani": [
-        HOME / "MISSIONS/APEX_INFRASTRUCTURE/aspen-grove-operator-v7/research/intelligence/actors/yamatani_profile.md",
+        HOME
+        / "MISSIONS/APEX_INFRASTRUCTURE/aspen-grove-operator-v7/research/intelligence/actors/yamatani_profile.md",
     ],
     "Shaw": [
         HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/ACTORS/THE_22_ACTOR_MATRIX.md",
     ],
     "_CASE": [
-        HOME / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/MASTER_EVIDENCE_INVENTORY.md",
-        HOME / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/AEON-777/DRAFT_1983_FEDERAL_COMPLAINT.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/MASTER_EVIDENCE_INVENTORY.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/SUPERLUMINAL_CASE_MATRIX/AEON-777/DRAFT_1983_FEDERAL_COMPLAINT.md",
         HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/MEM0_ACTIVE_CONTEXT_ORGANIZED.md",
         HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/ACTORS/THE_22_ACTOR_MATRIX.md",
-        HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/MASTER_INDEX.md",
-        HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/ADMISSIBILITY_FRAME.md",
-        HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/NOTION_AI_TOOLKIT.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/MASTER_INDEX.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/ADMISSIBILITY_FRAME.md",
+        HOME
+        / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/NOTION_AI_TOOLKIT.md",
     ],
 }
 
@@ -232,7 +319,10 @@ TEXT_RULES: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"barton v casey", re.I), ["Kekoa", "Teresa"]),
     (re.compile(r"f-00[1-9]|fraud event", re.I), ["Naso", "Shaw", "Brower", "_CASE"]),
     (re.compile(r"1fdv-23-0001009|1fdv‑23‑0001009", re.I), ["_CASE"]),
-    (re.compile(r"goose|aspen grove|motherduck|supabase|notion|github|swarm", re.I), ["_INFRA"]),
+    (
+        re.compile(r"goose|aspen grove|motherduck|supabase|notion|github|swarm", re.I),
+        ["_INFRA"],
+    ),
     (re.compile(r"vincent ai|api operations", re.I), ["_INFRA"]),
 ]
 
@@ -257,8 +347,20 @@ FILENAME_ACTOR_HINTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bhpd\b|honolulu police", re.I), "HPD"),
     (re.compile(r"queens hospital", re.I), "QueensHospital"),
     (re.compile(r"unemployment", re.I), "Unemployment"),
-    (re.compile(r"hawaii divorce|family court|1fdv|procedural violation|habeas|mandamus|tro", re.I), "_CASE"),
-    (re.compile(r"casual|greeting|api keys|slack token|student email|car rental|notion.*sync|google drive", re.I), "_UNROUTED"),
+    (
+        re.compile(
+            r"hawaii divorce|family court|1fdv|procedural violation|habeas|mandamus|tro",
+            re.I,
+        ),
+        "_CASE",
+    ),
+    (
+        re.compile(
+            r"casual|greeting|api keys|slack token|student email|car rental|notion.*sync|google drive",
+            re.I,
+        ),
+        "_UNROUTED",
+    ),
 ]
 
 
@@ -328,14 +430,16 @@ def parse_organized_md(path: Path) -> list[dict]:
         if not m_fact:
             continue
         fact_text = m_fact.group(1).strip()
-        facts.append({
-            "id": m_id.group(1) if m_id else "unknown",
-            "num": m_id.group(2) if m_id else "?",
-            "text": fact_text,
-            "source": "mem0_organized_md",
-            "section": section,
-            "actors": classify(fact_text, section),
-        })
+        facts.append(
+            {
+                "id": m_id.group(1) if m_id else "unknown",
+                "num": m_id.group(2) if m_id else "?",
+                "text": fact_text,
+                "source": "mem0_organized_md",
+                "section": section,
+                "actors": classify(fact_text, section),
+            }
+        )
     return facts
 
 
@@ -352,7 +456,11 @@ def fetch_mem0(user_id: str = "casey") -> list[dict]:
         )
         r.raise_for_status()
         data = r.json()
-        items = data if isinstance(data, list) else data.get("results", data.get("memories", []))
+        items = (
+            data
+            if isinstance(data, list)
+            else data.get("results", data.get("memories", []))
+        )
     except Exception:
         return []
     out = []
@@ -360,13 +468,15 @@ def fetch_mem0(user_id: str = "casey") -> list[dict]:
         text = (item.get("memory") or item.get("text") or "").strip()
         if not text or "API_KEY" in text or "sm-ops" in text.lower():
             continue
-        out.append({
-            "id": item.get("id", ""),
-            "text": text,
-            "source": f"mem0_cloud:{user_id}",
-            "actors": classify(text),
-            "created": item.get("created_at", ""),
-        })
+        out.append(
+            {
+                "id": item.get("id", ""),
+                "text": text,
+                "source": f"mem0_cloud:{user_id}",
+                "actors": classify(text),
+                "created": item.get("created_at", ""),
+            }
+        )
     return out
 
 
@@ -374,8 +484,19 @@ def fetch_supermemory(actor_name: str, limit: int = 5) -> list[dict]:
     query = f"{actor_name} litigation case 1FDV-23-0001009 evidence Hawaii family court"
     try:
         proc = subprocess.run(
-            ["sm-ops", "recall", query, "--limit", str(limit), "--no-rerank", "--format", "json"],
-            capture_output=True, text=True, timeout=60,
+            [
+                "sm-ops",
+                "recall",
+                query,
+                "--limit",
+                str(limit),
+                "--no-rerank",
+                "--format",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
             env={**os.environ, "PATH": f"{HOME}/bin:{os.environ.get('PATH', '')}"},
         )
         if proc.returncode != 0:
@@ -394,13 +515,15 @@ def fetch_supermemory(actor_name: str, limit: int = 5) -> list[dict]:
         if "sm-ops" in text.lower() and "token savings" in text.lower():
             continue
         actors = classify(text)
-        out.append({
-            "id": r.get("id", ""),
-            "text": text,
-            "source": "supermemory",
-            "similarity": r.get("similarity", 0),
-            "actors": actors,
-        })
+        out.append(
+            {
+                "id": r.get("id", ""),
+                "text": text,
+                "source": "supermemory",
+                "similarity": r.get("similarity", 0),
+                "actors": actors,
+            }
+        )
     return out
 
 
@@ -444,7 +567,11 @@ def link_plans(actor_dir: Path, slug: str, dry_run: bool) -> int:
 
 
 def write_actor_index(
-    actor_dir: Path, slug: str, memories: list[dict], plan_count: int, evidence_count: int
+    actor_dir: Path,
+    slug: str,
+    memories: list[dict],
+    plan_count: int,
+    evidence_count: int,
 ) -> None:
     meta = ACTOR_REGISTRY.get(slug, {"name": slug.replace("_", " ").strip() or slug})
     lines = [
@@ -467,15 +594,19 @@ def write_actor_index(
             lines.append(f"- {src}: {cnt}")
     else:
         lines.append("- (no routed memories yet)")
-    lines.extend([
-        "",
-        "## Quick files",
-        "",
-        "- `MEMORIES.md` — routed facts from Mem0 + Supermemory + organized index",
-        "- `PLANS/` — symlinks to ACTORS strike/smash/plan docs",
-        "- `EVIDENCE/` — litigation files + consolidated archive copies",
-    ])
-    actor_dir.joinpath("ACTOR_INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    lines.extend(
+        [
+            "",
+            "## Quick files",
+            "",
+            "- `MEMORIES.md` — routed facts from Mem0 + Supermemory + organized index",
+            "- `PLANS/` — symlinks to ACTORS strike/smash/plan docs",
+            "- `EVIDENCE/` — litigation files + consolidated archive copies",
+        ]
+    )
+    actor_dir.joinpath("ACTOR_INDEX.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 def write_memories_md(actor_dir: Path, slug: str, memories: list[dict]) -> None:
@@ -506,7 +637,9 @@ def write_memories_md(actor_dir: Path, slug: str, memories: list[dict]) -> None:
         lines.append("")
         lines.append(text)
         lines.append("")
-    actor_dir.joinpath("MEMORIES.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    actor_dir.joinpath("MEMORIES.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 def migrate_aliases(dry_run: bool) -> None:
@@ -654,22 +787,26 @@ def write_manifest(stats: dict) -> None:
         lines.append(
             f"| {name} | {info.get('memories', 0)} | {info.get('plans', 0)} | {info.get('evidence_files', 0)} |"
         )
-    lines.extend([
-        "",
-        "## Commands",
-        "",
-        "```bash",
-        "sm-ops actors                  # Re-sync memories + evidence",
-        "sm-ops actors --skip-supermemory",
-        "```",
-        "",
-        "## Meta folders",
-        "",
-        "- `_CASE` — cross-cutting litigation facts (fraud matrix, exhibits, dockets)",
-        "- `_INFRA` — APEX/stack configuration (not court evidence)",
-        "- `_UNROUTED/_NOISE` — chat/infra harvest excluded from actors",
-    ])
-    BY_ACTOR.joinpath("MANIFEST.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    lines.extend(
+        [
+            "",
+            "## Commands",
+            "",
+            "```bash",
+            "sm-ops actors                  # Re-sync memories + evidence",
+            "sm-ops actors --skip-supermemory",
+            "```",
+            "",
+            "## Meta folders",
+            "",
+            "- `_CASE` — cross-cutting litigation facts (fraud matrix, exhibits, dockets)",
+            "- `_INFRA` — APEX/stack configuration (not court evidence)",
+            "- `_UNROUTED/_NOISE` — chat/infra harvest excluded from actors",
+        ]
+    )
+    BY_ACTOR.joinpath("MANIFEST.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 def cleanup_le_archive_pollution(dry_run: bool) -> int:
@@ -708,7 +845,11 @@ def reroute_loose_evidence(dry_run: bool) -> dict[str, int]:
         if not dry_run:
             evidence_dir.mkdir(exist_ok=True)
         for f in list(actor_dir.iterdir()):
-            if not f.is_file() or f.name in ("ACTOR_INDEX.md", "MEMORIES.md", ".gitkeep"):
+            if not f.is_file() or f.name in (
+                "ACTOR_INDEX.md",
+                "MEMORIES.md",
+                ".gitkeep",
+            ):
                 continue
             hint = classify_filename(f.name)
             if hint and hint != slug:
@@ -718,7 +859,11 @@ def reroute_loose_evidence(dry_run: bool) -> dict[str, int]:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(f), str(target))
                 continue
-            if hint == "_UNROUTED" or (slug == "Le" and hint is None and not re.search(r"clerk|le\b", f.name, re.I)):
+            if hint == "_UNROUTED" or (
+                slug == "Le"
+                and hint is None
+                and not re.search(r"clerk|le\b", f.name, re.I)
+            ):
                 target = BY_ACTOR / "_UNROUTED" / f.name
                 stats["_UNROUTED"] += 1
                 if not dry_run:
@@ -757,7 +902,9 @@ def ensure_portfolio(slug: str, dry_run: bool) -> None:
             shutil.copy2(idx, pdir / "ACTOR_INDEX.md")
 
 
-def run(dry_run: bool = False, skip_supermemory: bool = False, skip_archives: bool = False) -> dict:
+def run(
+    dry_run: bool = False, skip_supermemory: bool = False, skip_archives: bool = False
+) -> dict:
     load_keys()
     migrate_aliases(dry_run)
 
@@ -779,7 +926,9 @@ def run(dry_run: bool = False, skip_supermemory: bool = False, skip_archives: bo
         for slug, meta in ACTOR_REGISTRY.items():
             for sm in fetch_supermemory(meta["name"], limit=3):
                 for target in sm["actors"]:
-                    if target == slug or (not target.startswith("_") and target in sm["actors"]):
+                    if target == slug or (
+                        not target.startswith("_") and target in sm["actors"]
+                    ):
                         bucket[slug].append(sm)
                         break
                 else:
@@ -794,7 +943,9 @@ def run(dry_run: bool = False, skip_supermemory: bool = False, skip_archives: bo
     ref_stats = link_references(dry_run)
     triage_stats = triage_unrouted(dry_run)
 
-    all_slugs = sorted(set(ACTOR_REGISTRY) | set(bucket) | {"_CASE", "_INFRA", "_UNROUTED"})
+    all_slugs = sorted(
+        set(ACTOR_REGISTRY) | set(bucket) | {"_CASE", "_INFRA", "_UNROUTED"}
+    )
     stats: dict = {
         "actors": {},
         "total_memories": 0,
@@ -835,17 +986,28 @@ def run(dry_run: bool = False, skip_supermemory: bool = False, skip_archives: bo
         write_manifest(stats)
         STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         STATE_PATH.write_text(
-            json.dumps({**stats, "at": datetime.now(timezone.utc).isoformat()}, indent=2) + "\n"
+            json.dumps(
+                {**stats, "at": datetime.now(timezone.utc).isoformat()}, indent=2
+            )
+            + "\n"
         )
 
     return stats
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Organize memories into BY_ACTOR folders")
+    parser = argparse.ArgumentParser(
+        description="Organize memories into BY_ACTOR folders"
+    )
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--skip-supermemory", action="store_true", help="Faster run, Mem0/organized only")
-    parser.add_argument("--skip-archives", action="store_true", help="Skip vault archive consolidation")
+    parser.add_argument(
+        "--skip-supermemory",
+        action="store_true",
+        help="Faster run, Mem0/organized only",
+    )
+    parser.add_argument(
+        "--skip-archives", action="store_true", help="Skip vault archive consolidation"
+    )
     args = parser.parse_args()
     stats = run(
         dry_run=args.dry_run,

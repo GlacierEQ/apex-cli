@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -53,21 +52,33 @@ MCP_MESH = {
     },
 }
 
-RISKY_ACTIONS = frozenset({
-    "move_original", "overwrite", "delete", "share", "publish",
-    "external_sync", "archive_move",
-})
+RISKY_ACTIONS = frozenset(
+    {
+        "move_original",
+        "overwrite",
+        "delete",
+        "share",
+        "publish",
+        "external_sync",
+        "archive_move",
+    }
+)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _run(cmd: list[str], cwd: Path | None = None, timeout: int = 120) -> tuple[int, str]:
+def _run(
+    cmd: list[str], cwd: Path | None = None, timeout: int = 120
+) -> tuple[int, str]:
     try:
         r = subprocess.run(
-            cmd, cwd=str(cwd) if cwd else None,
-            capture_output=True, text=True, timeout=timeout,
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
             env={**os.environ},
         )
         return r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
@@ -84,36 +95,46 @@ def mesh_status() -> str:
             keys_loaded = json.loads(VAULT_MANIFEST.read_text()).get("total_keys", 0)
         except json.JSONDecodeError:
             pass
-    return json.dumps({
-        "at": _now(),
-        "gatekeeper": "ColossusGateKeeper v1",
-        "case": os.environ.get("CASE_ID", "1FDV-23-0001009"),
-        "keys_in_vault": keys_loaded,
-        "mesh": MCP_MESH,
-        "routing_guide": {
-            "filesystem_ops": "use apex-filesystem MCP or gatekeeper safe_read/safe_hash",
-            "memory_search": "use unified-memory MCP or gatekeeper memory_route",
-            "case_protocols": "use gatekeeper nexus_status / nexus_ingest",
-            "high_risk_writes": "must pass gate_action first — Colossus approval required",
+    return json.dumps(
+        {
+            "at": _now(),
+            "gatekeeper": "ColossusGateKeeper v1",
+            "case": os.environ.get("CASE_ID", "1FDV-23-0001009"),
+            "keys_in_vault": keys_loaded,
+            "mesh": MCP_MESH,
+            "routing_guide": {
+                "filesystem_ops": "use apex-filesystem MCP or gatekeeper safe_read/safe_hash",
+                "memory_search": "use unified-memory MCP or gatekeeper memory_route",
+                "case_protocols": "use gatekeeper nexus_status / nexus_ingest",
+                "high_risk_writes": "must pass gate_action first — Colossus approval required",
+            },
         },
-    }, indent=2)
+        indent=2,
+    )
 
 
 @mcp.tool()
 def key_power_status() -> str:
     """Report which API services have keys loaded (names only, never values)."""
     if not VAULT_MANIFEST.is_file():
-        return json.dumps({"error": "Run prime_key_vault first", "manifest": str(VAULT_MANIFEST)})
+        return json.dumps(
+            {"error": "Run prime_key_vault first", "manifest": str(VAULT_MANIFEST)}
+        )
     data = json.loads(VAULT_MANIFEST.read_text())
-    return json.dumps({
-        "at": data.get("at"),
-        "total": data.get("total_keys"),
-        "note": data.get("note"),
-        "services": [s["env_var"] for s in data.get("services", [])],
-        "historical_sources": [
-            s["env_var"] for s in data.get("services", []) if s.get("historical_source")
-        ],
-    }, indent=2)
+    return json.dumps(
+        {
+            "at": data.get("at"),
+            "total": data.get("total_keys"),
+            "note": data.get("note"),
+            "services": [s["env_var"] for s in data.get("services", [])],
+            "historical_sources": [
+                s["env_var"]
+                for s in data.get("services", [])
+                if s.get("historical_source")
+            ],
+        },
+        indent=2,
+    )
 
 
 @mcp.tool()
@@ -138,16 +159,21 @@ def gate_action(action_class: str, target_path: str = "", reason: str = "") -> s
     else:
         approval = "unknown_review_required"
 
-    return json.dumps({
-        "at": _now(),
-        "action_class": action,
-        "target_path": target_path,
-        "reason": reason,
-        "approval": approval,
-        "policy": str(POLICY_PATH),
-        "allowed_now": approval == "auto",
-        "next_step": "Proceed" if approval == "auto" else "Obtain Colossus ApprovalRecord before execution",
-    }, indent=2)
+    return json.dumps(
+        {
+            "at": _now(),
+            "action_class": action,
+            "target_path": target_path,
+            "reason": reason,
+            "approval": approval,
+            "policy": str(POLICY_PATH),
+            "allowed_now": approval == "auto",
+            "next_step": "Proceed"
+            if approval == "auto"
+            else "Obtain Colossus ApprovalRecord before execution",
+        },
+        indent=2,
+    )
 
 
 @mcp.tool()
@@ -180,6 +206,7 @@ def safe_read(path: str, max_chars: int = 8000) -> str:
 def safe_hash(path: str) -> str:
     """SHA256 chain-of-custody hash — auto-approved."""
     import hashlib
+
     root = Path(os.environ.get("APEX_ROOT", str(HOME))).resolve()
     p = Path(path).expanduser().resolve()
     try:
@@ -192,7 +219,9 @@ def safe_hash(path: str) -> str:
     with p.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
-    return json.dumps({"path": str(p), "sha256": h.hexdigest(), "size": p.stat().st_size})
+    return json.dumps(
+        {"path": str(p), "sha256": h.hexdigest(), "size": p.stat().st_size}
+    )
 
 
 @mcp.tool()
@@ -207,8 +236,12 @@ def nexus_status() -> str:
 def nexus_ingest(file_path: str) -> str:
     """Ingest document through Nexus (extraction + Notion push if API valid)."""
     nexus = ALPHA / "apex_nexus_coordinator.py"
-    code, out = _run(["python3", str(nexus), "ingest", "--file", file_path], cwd=ALPHA, timeout=120)
-    return json.dumps({"ok": code == 0, "file": file_path, "output": out[-2000:]}, indent=2)
+    code, out = _run(
+        ["python3", str(nexus), "ingest", "--file", file_path], cwd=ALPHA, timeout=120
+    )
+    return json.dumps(
+        {"ok": code == 0, "file": file_path, "output": out[-2000:]}, indent=2
+    )
 
 
 @mcp.tool()
@@ -231,7 +264,14 @@ def agent_boot() -> str:
             pass
     if boot_md.is_file():
         return boot_md.read_text(encoding="utf-8", errors="replace")[:6000]
-    code, out = _run(["python3", str(HOME / "scripts/apex_agentic_maximize.py"), "--quick", "--skip-prime"])
+    code, out = _run(
+        [
+            "python3",
+            str(HOME / "scripts/apex_agentic_maximize.py"),
+            "--quick",
+            "--skip-prime",
+        ]
+    )
     if boot_json.is_file():
         return boot_json.read_text()
     return json.dumps({"ok": code == 0, "detail": out[-500:]}, indent=2)
@@ -281,7 +321,15 @@ def skills_router() -> str:
     """Compact skills index — names, paths, routing hints (~low tokens)."""
     path = HOME / ".apex/SKILLS_ROUTER.json"
     if not path.is_file():
-        code, _ = _run(["python3", str(HOME / "scripts/apex_agentic_maximize.py"), "--quick", "--skip-prime", "--skip-connectors"])
+        code, _ = _run(
+            [
+                "python3",
+                str(HOME / "scripts/apex_agentic_maximize.py"),
+                "--quick",
+                "--skip-prime",
+                "--skip-connectors",
+            ]
+        )
         if not path.is_file():
             return json.dumps({"error": "skills router not built", "ok": code == 0})
     return path.read_text(encoding="utf-8", errors="replace")[:12000]
@@ -292,7 +340,15 @@ def connector_mesh() -> str:
     """MCP connector mesh — Grok + Gemini server names, routing (no secrets)."""
     path = HOME / ".apex/CONNECTOR_MESH.json"
     if not path.is_file():
-        _run(["python3", str(HOME / "scripts/apex_agentic_maximize.py"), "--quick", "--skip-prime", "--skip-skills"])
+        _run(
+            [
+                "python3",
+                str(HOME / "scripts/apex_agentic_maximize.py"),
+                "--quick",
+                "--skip-prime",
+                "--skip-skills",
+            ]
+        )
     if path.is_file():
         return path.read_text(encoding="utf-8", errors="replace")
     return json.dumps({"error": "connector mesh not built"}, indent=2)
@@ -328,7 +384,15 @@ def workflow_router() -> str:
     """Execution workflow — 5 phases, task routing, MCP combo, logic rules (~low tokens)."""
     path = HOME / ".apex/WORKFLOW_ROUTER.json"
     if not path.is_file():
-        _run(["python3", str(HOME / "scripts/apex_agentic_maximize.py"), "--quick", "--skip-prime", "--skip-keys"])
+        _run(
+            [
+                "python3",
+                str(HOME / "scripts/apex_agentic_maximize.py"),
+                "--quick",
+                "--skip-prime",
+                "--skip-keys",
+            ]
+        )
     if path.is_file():
         return path.read_text(encoding="utf-8", errors="replace")[:10000]
     return json.dumps({"error": "workflow router not built"}, indent=2)
@@ -340,7 +404,9 @@ def memory_layer_status() -> str:
     path = HOME / ".apex/memory_layer_status.json"
     if path.is_file():
         return path.read_text(encoding="utf-8", errors="replace")
-    code, out = _run(["python3", str(HOME / "scripts/unified_memory_mcp.py"), "health"], timeout=90)
+    code, out = _run(
+        ["python3", str(HOME / "scripts/unified_memory_mcp.py"), "health"], timeout=90
+    )
     if code == 0 and out.strip().startswith("{"):
         return out
     code, out = _run(["sm-ops", "tokens", "--format", "json"], timeout=30)
@@ -360,15 +426,20 @@ def memory_route(query: str, layers: str = "") -> str:
 @mcp.tool()
 def list_case_roots() -> str:
     """Canonical paths for case filesystem operations."""
-    return json.dumps({
-        "APEX_ROOT": os.environ.get("APEX_ROOT", str(HOME)),
-        "CASE_ROOT": os.environ.get("CASE_ROOT", str(CASE_ROOT)),
-        "EVIDENCE_ROOT": os.environ.get("EVIDENCE_ROOT", str(CASE_ROOT / "EVIDENCE")),
-        "alpha_repo": str(ALPHA),
-        "app_catalog": str(HOME / "MISSIONS/APP_CATALOG/MANIFEST.md"),
-        "by_actor": str(CASE_ROOT / "EVIDENCE/BY_ACTOR"),
-        "journal": str(CASE_ROOT / "CHATGPT_LIFE_RECORD"),
-    }, indent=2)
+    return json.dumps(
+        {
+            "APEX_ROOT": os.environ.get("APEX_ROOT", str(HOME)),
+            "CASE_ROOT": os.environ.get("CASE_ROOT", str(CASE_ROOT)),
+            "EVIDENCE_ROOT": os.environ.get(
+                "EVIDENCE_ROOT", str(CASE_ROOT / "EVIDENCE")
+            ),
+            "alpha_repo": str(ALPHA),
+            "app_catalog": str(HOME / "MISSIONS/APP_CATALOG/MANIFEST.md"),
+            "by_actor": str(CASE_ROOT / "EVIDENCE/BY_ACTOR"),
+            "journal": str(CASE_ROOT / "CHATGPT_LIFE_RECORD"),
+        },
+        indent=2,
+    )
 
 
 if __name__ == "__main__":

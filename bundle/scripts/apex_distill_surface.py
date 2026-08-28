@@ -44,7 +44,9 @@ def _load(path: Path) -> dict:
 
 def _run(cmd: list[str], timeout: int = 15) -> str:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(HOME))
+        r = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=str(HOME)
+        )
         return (r.stdout or "").strip()
     except Exception:
         return ""
@@ -68,7 +70,9 @@ def distill() -> tuple[dict, str]:
 
     keys = vault.get("total_keys", 156)
     obs = elev.get("alpha", {}).get("observations", 0)
-    pistons = omega.get("pistons_online", elev.get("omega", {}).get("pistons_online", 0))
+    pistons = omega.get(
+        "pistons_online", elev.get("omega", {}).get("pistons_online", 0)
+    )
     tokens_saved = 0
     tok_out = _run(["sm-ops", "tokens"])
     for line in tok_out.splitlines():
@@ -95,8 +99,12 @@ def distill() -> tuple[dict, str]:
         "workflow": "boot → plan → execute → verify → save",
         "mcp": {
             "supreme": "colossus-gatekeeper",
-            "direct": conn.get("grok_mcp", ["colossus-gatekeeper", "apex-filesystem", "unified-memory"]),
-            "gemini_cloud": conn.get("routing", {}).get("cloud_files", "gdrive|dropbox|onedrive"),
+            "direct": conn.get(
+                "grok_mcp", ["colossus-gatekeeper", "apex-filesystem", "unified-memory"]
+            ),
+            "gemini_cloud": conn.get("routing", {}).get(
+                "cloud_files", "gdrive|dropbox|onedrive"
+            ),
         },
         "routing": {
             "filesystem": "gatekeeper safe_read/hash OR apex-filesystem",
@@ -137,7 +145,9 @@ def distill() -> tuple[dict, str]:
                 [r["name"] for r in access.get("hot_paths", {}).get("results", [])],
                 access.get("hot_paths", {}).get("results", []),
             )
-        ] if access.get("hot_paths") else [],
+        ]
+        if access.get("hot_paths")
+        else [],
     }
 
     md = f"""# APEX Operating Surface
@@ -151,10 +161,10 @@ def distill() -> tuple[dict, str]:
 | Keys | {keys} |
 | Observations | {obs:,} |
 | Omega pistons | {pistons}/12 |
-| File sources | {payload['status']['file_sources']} OK |
+| File sources | {payload["status"]["file_sources"]} OK |
 | Token savings | ~{tokens_saved:,} |
-| Processes | {payload['status']['processes']} |
-| Notion | {'Online' if payload['status']['notion'] else 'Degraded'} |
+| Processes | {payload["status"]["processes"]} |
+| Notion | {"Online" if payload["status"]["notion"] else "Degraded"} |
 
 ## Workflow
 
@@ -174,13 +184,13 @@ def distill() -> tuple[dict, str]:
 
 | Resource | Path |
 |----------|------|
-| Alpha | `{payload['paths']['alpha']}` |
-| Omega | `{payload['paths']['omega']}` |
-| Case | `{payload['paths']['case']}` |
-| Evidence | `{payload['paths']['evidence']}` |
-| Journal | `{payload['paths']['journal']}` |
-| By actor | `{payload['paths']['by_actor']}` |
-| Keys | `{payload['paths']['keys']}` |
+| Alpha | `{payload["paths"]["alpha"]}` |
+| Omega | `{payload["paths"]["omega"]}` |
+| Case | `{payload["paths"]["case"]}` |
+| Evidence | `{payload["paths"]["evidence"]}` |
+| Journal | `{payload["paths"]["journal"]}` |
+| By actor | `{payload["paths"]["by_actor"]}` |
+| Keys | `{payload["paths"]["keys"]}` |
 
 ## Commands (copy-paste)
 

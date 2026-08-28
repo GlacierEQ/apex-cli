@@ -5,6 +5,7 @@ This host adapter selects the baseline plus relevant installed specialist skills
 and emits composition evidence. Canonical runtime lifecycle, capability,
 idempotency, replay, governor, and SLO semantics are owned by Apex Boot Core.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -18,7 +19,11 @@ from typing import Any, Iterable
 
 HOME = Path(os.getenv("HOME", ""))
 APEX = HOME / ".apex"
-ACTIVATION_PATH = Path(os.getenv("GLACIEREQ_MASTERSKILL_ACTIVATION", str(APEX / "MASTERSKILL_ACTIVATION.json")))
+ACTIVATION_PATH = Path(
+    os.getenv(
+        "GLACIEREQ_MASTERSKILL_ACTIVATION", str(APEX / "MASTERSKILL_ACTIVATION.json")
+    )
+)
 STARTUP_STATE_PATH = APEX / "STARTUP_STATE.json"
 MANIFEST_PATH = HOME / "SKILLS_MANIFEST.json"
 LIVE_CONTEXT_PATH = HOME / ".supermemory" / "ops" / "live-context.md"
@@ -108,7 +113,9 @@ def select_specialists(prompt: str, manifest: dict[str, Any]) -> list[str]:
             selected.update(skills)
     for skill in manifest_skill_names(manifest):
         normalized = skill.lower().replace("_", " ").replace("-", " ")
-        if normalized in cleaned or any(part in words for part in normalized.split() if len(part) > 3):
+        if normalized in cleaned or any(
+            part in words for part in normalized.split() if len(part) > 3
+        ):
             selected.add(skill)
     selected.discard(MASTERSKILL)
     return sorted(selected)
@@ -119,7 +126,13 @@ def skill_record(name: str) -> dict[str, Any]:
     if path is None:
         return {"name": name, "found": False, "path": None, "sha256": None, "raw": ""}
     raw = path.read_text(encoding="utf-8")
-    return {"name": name, "found": True, "path": str(path), "sha256": file_hash(path), "raw": raw}
+    return {
+        "name": name,
+        "found": True,
+        "path": str(path),
+        "sha256": file_hash(path),
+        "raw": raw,
+    }
 
 
 def activation_blockers(activation: dict[str, Any]) -> list[str]:
@@ -137,7 +150,9 @@ def activation_blockers(activation: dict[str, Any]) -> list[str]:
     return blockers
 
 
-def write_live_context(activation: dict[str, Any], skills: list[dict[str, Any]]) -> None:
+def write_live_context(
+    activation: dict[str, Any], skills: list[dict[str, Any]]
+) -> None:
     LIVE_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "# APEX PRIMED LIVE CONTEXT",
@@ -149,7 +164,9 @@ def write_live_context(activation: dict[str, Any], skills: list[dict[str, Any]])
         "## Resolved skills",
     ]
     for skill in skills:
-        lines.append(f"- `{skill['name']}` path=`{skill['path'] or 'MISSING'}` sha256=`{skill['sha256'] or 'MISSING'}`")
+        lines.append(
+            f"- `{skill['name']}` path=`{skill['path'] or 'MISSING'}` sha256=`{skill['sha256'] or 'MISSING'}`"
+        )
     LIVE_CONTEXT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -159,16 +176,24 @@ def persist(receipt: dict[str, Any]) -> Path:
     with immutable.open("x", encoding="utf-8") as handle:
         json.dump(receipt, handle, indent=2)
         handle.write("\n")
-    LATEST_RECEIPT_PATH.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    LATEST_RECEIPT_PATH.write_text(
+        json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
+    )
     with LEDGER_PATH.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps({
-            "receipt_id": receipt["receipt_id"],
-            "at": receipt["at"],
-            "status": receipt["status"],
-            "prompt_sha256": receipt["prompt_sha256"],
-            "canonical_commit": receipt["activation"]["canonical_commit"],
-            "immutable_path": str(immutable),
-        }, sort_keys=True) + "\n")
+        handle.write(
+            json.dumps(
+                {
+                    "receipt_id": receipt["receipt_id"],
+                    "at": receipt["at"],
+                    "status": receipt["status"],
+                    "prompt_sha256": receipt["prompt_sha256"],
+                    "canonical_commit": receipt["activation"]["canonical_commit"],
+                    "immutable_path": str(immutable),
+                },
+                sort_keys=True,
+            )
+            + "\n"
+        )
     return immutable
 
 
@@ -184,14 +209,19 @@ def main() -> int:
 
     masterskill = skills[0]
     if not masterskill["found"]:
-        print(f"APEX composition failed: required masterskill {MASTERSKILL} not installed", file=sys.stderr)
+        print(
+            f"APEX composition failed: required masterskill {MASTERSKILL} not installed",
+            file=sys.stderr,
+        )
         return 2
 
     blockers = activation_blockers(activation)
     canonical_commit = str(activation.get("canonical_commit", ""))
     if canonical_commit and canonical_commit not in masterskill["raw"]:
         blockers.append("masterskill_projection_pin_mismatch")
-    blockers.extend(f"missing_skill:{skill['name']}" for skill in skills if not skill["found"])
+    blockers.extend(
+        f"missing_skill:{skill['name']}" for skill in skills if not skill["found"]
+    )
     blockers = ordered_unique(blockers)
 
     write_live_context(activation, skills)
@@ -206,7 +236,11 @@ def main() -> int:
         "status": "READY" if not blockers else "DEGRADED",
         "blockers": blockers,
         "masterskill": MASTERSKILL,
-        "adapter": {"id": COMPILER_ID, "path": str(compiler_path), "sha256": file_hash(compiler_path)},
+        "adapter": {
+            "id": COMPILER_ID,
+            "path": str(compiler_path),
+            "sha256": file_hash(compiler_path),
+        },
         "activation": {
             "path": str(ACTIVATION_PATH),
             "sha256": file_hash(ACTIVATION_PATH) if ACTIVATION_PATH.is_file() else None,
@@ -215,10 +249,15 @@ def main() -> int:
             "canonical_commit": activation.get("canonical_commit"),
             "lifecycle": activation.get("lifecycle", []),
         },
-        "startup_state_sha256": file_hash(STARTUP_STATE_PATH) if STARTUP_STATE_PATH.is_file() else None,
+        "startup_state_sha256": file_hash(STARTUP_STATE_PATH)
+        if STARTUP_STATE_PATH.is_file()
+        else None,
         "prompt_sha256": prompt_hash,
         "prompt_length": len(prompt),
-        "skills": [{k: skill[k] for k in ("name", "found", "path", "sha256")} for skill in skills],
+        "skills": [
+            {k: skill[k] for k in ("name", "found", "path", "sha256")}
+            for skill in skills
+        ],
         "missing_skills": [skill["name"] for skill in skills if not skill["found"]],
         "skill_roots": [str(root) for root in SKILL_ROOTS],
         "continuation": "Read this composition receipt together with the canonical runtime receipt before rediscovery.",
@@ -230,7 +269,9 @@ def main() -> int:
         state.setdefault("skills", {})["canonical_entrypoint"] = MASTERSKILL
         state["skills"]["active"] = selected
         state["last_composition_receipt"] = str(LATEST_RECEIPT_PATH)
-        STARTUP_STATE_PATH.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        STARTUP_STATE_PATH.write_text(
+            json.dumps(state, indent=2) + "\n", encoding="utf-8"
+        )
 
     print(f"APEX NERVOUS-SYSTEM COMPOSITION: {receipt['status']}")
     print(f"Immutable composition receipt: {immutable}")

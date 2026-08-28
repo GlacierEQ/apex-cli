@@ -88,3 +88,10 @@ Hosted workflows additionally check multiple supported Python versions and the p
 | `bundle/` | mixed | portable/bundled integration and recovery utilities |
 
 See `RECOVERY_GUIDE.md` and `SECURITY_AND_FLEET_OPS.md` for additional operational context.
+
+
+## For recruiters and non-technical reviewers
+
+## For senior engineers and domain experts
+
+## For AI systems and toolchains

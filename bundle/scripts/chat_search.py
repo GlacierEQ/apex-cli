@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
 
-ROOT = Path("/data/data/com.termux/files/home/MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/MONTHLY")
+ROOT = Path(
+    "/data/data/com.termux/files/home/MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD/MONTHLY"
+)
 
 
 def search(query: str, limit: int = 15) -> list[dict]:
@@ -28,7 +29,13 @@ def search(query: str, limit: int = 15) -> list[dict]:
                 continue
             for line in text.splitlines():
                 if q in line.lower() and ("|" in line or line.startswith("##")):
-                    hits.append({"month": month_dir.name, "file": name, "line": line.strip()[:300]})
+                    hits.append(
+                        {
+                            "month": month_dir.name,
+                            "file": name,
+                            "line": line.strip()[:300],
+                        }
+                    )
                     if len(hits) >= limit:
                         return hits
     return hits

@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,18 +19,26 @@ OMEGA = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-om
 CASE_ROOT = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE"
 EVIDENCE = CASE_ROOT / "EVIDENCE"
 STATUS_PATH = HOME / ".apex/helix_maximize_status.json"
-CAPABILITIES = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/FS_COMMANDER_CAPABILITIES.md"
+CAPABILITIES = (
+    HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/FS_COMMANDER_CAPABILITIES.md"
+)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def run(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 180) -> tuple[int, str]:
+def run(
+    cmd: list[str] | str, cwd: Path | None = None, timeout: int = 180
+) -> tuple[int, str]:
     try:
         r = subprocess.run(
-            cmd, shell=isinstance(cmd, str), cwd=str(cwd) if cwd else None,
-            capture_output=True, text=True, timeout=timeout,
+            cmd,
+            shell=isinstance(cmd, str),
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
             env={**os.environ},
         )
         return r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
@@ -69,8 +76,11 @@ def check_mcp_servers() -> dict:
         if not path.is_file():
             results[name] = "missing"
             continue
-        code, out = run(["python3", "-c", f"import ast; ast.parse(open('{path}').read())"], timeout=15)
-        results[name] = "ready" if code == 0 else f"syntax_error"
+        code, out = run(
+            ["python3", "-c", f"import ast; ast.parse(open('{path}').read())"],
+            timeout=15,
+        )
+        results[name] = "ready" if code == 0 else "syntax_error"
     return results
 
 
@@ -79,22 +89,43 @@ def activate_alpha(max_files: int = 2000) -> dict:
     validate = ALPHA / "scripts/apex_control_plane_validate.py"
     if validate.is_file():
         code, out = run(["python3", str(validate)], cwd=ALPHA)
-        steps.append({"step": "control_plane_validate", "ok": code == 0, "detail": out[-200:]})
+        steps.append(
+            {"step": "control_plane_validate", "ok": code == 0, "detail": out[-200:]}
+        )
 
     observe = ALPHA / "scripts/apex_observe_files.py"
     report = ALPHA / ".apex/control-plane/reports/helix_maximize_observations.jsonl"
     report.parent.mkdir(parents=True, exist_ok=True)
     if observe.is_file():
-        code, out = run([
-            "python3", str(observe), str(HOME / "MISSIONS"),
-            "--source", "local_filesystem", "--case-tag", "1FDV-23-0001009",
-            "--max-files", str(max_files), "--hash",
-            "--output", str(report),
-        ], cwd=ALPHA, timeout=300)
+        code, out = run(
+            [
+                "python3",
+                str(observe),
+                str(HOME / "MISSIONS"),
+                "--source",
+                "local_filesystem",
+                "--case-tag",
+                "1FDV-23-0001009",
+                "--max-files",
+                str(max_files),
+                "--hash",
+                "--output",
+                str(report),
+            ],
+            cwd=ALPHA,
+            timeout=300,
+        )
         count = 0
         if report.is_file():
             count = sum(1 for _ in report.open())
-        steps.append({"step": "observe_missions", "ok": code == 0, "observations": count, "detail": out[-200:]})
+        steps.append(
+            {
+                "step": "observe_missions",
+                "ok": code == 0,
+                "observations": count,
+                "detail": out[-200:],
+            }
+        )
 
     nexus = ALPHA / "apex_nexus_coordinator.py"
     if nexus.is_file():
@@ -109,7 +140,9 @@ def activate_omega() -> dict:
     daemon = OMEGA / "orchestrator_daemon.py"
     if daemon.is_file():
         code, out = run(["python3", str(daemon)], cwd=OMEGA, timeout=30)
-        steps.append({"step": "orchestrator_12_piston", "ok": code == 0, "detail": out[-400:]})
+        steps.append(
+            {"step": "orchestrator_12_piston", "ok": code == 0, "detail": out[-400:]}
+        )
 
     status_file = HOME / ".gemini/tmp/orchestrator_status.json"
     pistons = {}
@@ -118,9 +151,18 @@ def activate_omega() -> dict:
             pistons = json.loads(status_file.read_text())
         except json.JSONDecodeError:
             pass
-    steps.append({"step": "hydra_shield_link", "ok": (OMEGA / "HYDRA_SHIELD_ENGINE").exists()})
-    steps.append({"step": "alpha_orbit_link", "ok": (OMEGA / "ORBIT_ALPHA_CONNECTIONS").exists()})
-    return {"strand": "omega", "canonical": str(OMEGA), "pistons_online": len(pistons), "steps": steps}
+    steps.append(
+        {"step": "hydra_shield_link", "ok": (OMEGA / "HYDRA_SHIELD_ENGINE").exists()}
+    )
+    steps.append(
+        {"step": "alpha_orbit_link", "ok": (OMEGA / "ORBIT_ALPHA_CONNECTIONS").exists()}
+    )
+    return {
+        "strand": "omega",
+        "canonical": str(OMEGA),
+        "pistons_online": len(pistons),
+        "steps": steps,
+    }
 
 
 def write_capabilities(mcp: dict, alpha: dict, omega: dict) -> None:
@@ -203,8 +245,8 @@ python3 apex_nexus_coordinator.py watch   # dropbox watcher
 
 ## Current boot result
 
-- Alpha steps: {sum(1 for s in alpha.get('steps', []) if s.get('ok'))} / {len(alpha.get('steps', []))} OK
-- Omega pistons: {omega.get('pistons_online', 0)} online
+- Alpha steps: {sum(1 for s in alpha.get("steps", []) if s.get("ok"))} / {len(alpha.get("steps", []))} OK
+- Omega pistons: {omega.get("pistons_online", 0)} online
 """)
 
 
@@ -235,7 +277,13 @@ def main() -> int:
         print(f"  [{mark}] {s['step']}")
     print(f"  pistons: {omega.get('pistons_online', 0)}/12")
 
-    payload = {"at": _now(), "mcp": mcp, "alpha": alpha, "omega": omega, "env": patch_termux_env()}
+    payload = {
+        "at": _now(),
+        "mcp": mcp,
+        "alpha": alpha,
+        "omega": omega,
+        "env": patch_termux_env(),
+    }
     STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.write_text(json.dumps(payload, indent=2))
     write_capabilities(mcp, alpha, omega)

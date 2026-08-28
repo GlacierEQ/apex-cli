@@ -18,6 +18,7 @@ log = logging.getLogger("connections")
 
 CONFIG_PATH = Path(os.path.expanduser("~/.apex/connections.json"))
 
+
 class ConnectionManager:
     """
     Manages SaaS connection IDs and credentials.
@@ -96,11 +97,13 @@ class ConnectionManager:
 # Singleton
 _manager: Optional[ConnectionManager] = None
 
+
 def get_manager() -> ConnectionManager:
     global _manager
     if _manager is None:
         _manager = ConnectionManager()
     return _manager
+
 
 def get_connection(service: str) -> Optional[str]:
     """Convenience: get a connection ID."""

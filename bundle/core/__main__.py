@@ -12,12 +12,12 @@ Usage:
 import argparse
 import json
 import sys
-from pathlib import Path
 
 
 def cmd_boot(args):
     """Verify system is ready."""
     from pipeline import make_boot_pipeline
+
     p = make_boot_pipeline()
     report = p.run()
     if report["status"] != "passed":
@@ -27,6 +27,7 @@ def cmd_boot(args):
 def cmd_pipeline(args):
     """Run full boot pipeline."""
     from pipeline import make_boot_pipeline
+
     p = make_boot_pipeline()
     report = p.run()
     print(json.dumps(report, indent=2))
@@ -35,6 +36,7 @@ def cmd_pipeline(args):
 def cmd_skill(args):
     """Run a specific skill."""
     from pipeline import make_skill_pipeline
+
     p = make_skill_pipeline(args.name)
     p.set("services_needed", args.services.split(",") if args.services else [])
     report = p.run()
@@ -64,12 +66,12 @@ def cmd_linkedin(args):
             b.wait(3000)
             b.evaluate = b.eval_js
             # Use keyboard approach
-            b.eval_js(f"""
-                (() => {{
+            b.eval_js("""
+                (() => {
                     const inputs = document.querySelectorAll('input[type="email"]');
                     const target = inputs[inputs.length - 1];
-                    if (target) {{ target.focus(); }}
-                }})()
+                    if (target) { target.focus(); }
+                })()
             """)
             b.type_text(args.email)
             b.press_key("Tab")
@@ -101,6 +103,7 @@ def cmd_linkedin(args):
         return text
 
     from pipeline import Pipeline
+
     p = Pipeline("linkedin-fetch")
     p.phase("fetch", fetch_linkedin)
     report = p.run()
@@ -117,6 +120,7 @@ def cmd_linkedin(args):
 def cmd_gmail(args):
     """Run Gmail operations."""
     from pipeline import make_skill_pipeline
+
     p = make_skill_pipeline("gmail-orchestrator", services=["gmail"])
     p.set("gmail_mode", args.mode)
     report = p.run()
@@ -126,8 +130,7 @@ def cmd_gmail(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="computer-user",
-        description="Platform-agnostic desktop automation agent"
+        prog="computer-user", description="Platform-agnostic desktop automation agent"
     )
     sub = parser.add_subparsers(dest="command", help="Command to run")
 
@@ -152,7 +155,9 @@ def main():
 
     # gmail
     gmail_p = sub.add_parser("gmail", help="Gmail operations")
-    gmail_p.add_argument("--mode", default="triage", choices=["triage", "forensic", "draft", "full"])
+    gmail_p.add_argument(
+        "--mode", default="triage", choices=["triage", "forensic", "draft", "full"]
+    )
 
     args = parser.parse_args()
 

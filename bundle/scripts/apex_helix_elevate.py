@@ -21,14 +21,18 @@ HOME = Path(os.environ.get("HOME", "/data/data/com.termux/files/home"))
 ALPHA = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-alpha"
 OMEGA = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-omega"
 STATUS_PATH = HOME / ".apex/helix_elevation_status.json"
-CAPABILITIES = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/FS_COMMANDER_CAPABILITIES.md"
+CAPABILITIES = (
+    HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/FS_COMMANDER_CAPABILITIES.md"
+)
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _run(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 180) -> tuple[int, str]:
+def _run(
+    cmd: list[str] | str, cwd: Path | None = None, timeout: int = 180
+) -> tuple[int, str]:
     try:
         r = subprocess.run(
             cmd,
@@ -47,10 +51,16 @@ def _run(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 180) -> t
 def alpha_elevate() -> dict:
     steps = []
 
-    code, out = _run(["python3", "scripts/apex_control_plane_validate.py", "--strict"], cwd=ALPHA)
+    code, out = _run(
+        ["python3", "scripts/apex_control_plane_validate.py", "--strict"], cwd=ALPHA
+    )
     steps.append({"step": "control_plane_strict", "ok": code == 0})
 
-    code, out = _run(["python3", "-m", "pytest", "tests/test_apex_readiness.py", "-q"], cwd=ALPHA, timeout=120)
+    code, out = _run(
+        ["python3", "-m", "pytest", "tests/test_apex_readiness.py", "-q"],
+        cwd=ALPHA,
+        timeout=120,
+    )
     steps.append({"step": "readiness_tests", "ok": code == 0, "detail": out[-300:]})
 
     obs_dir = ALPHA / ".apex/control-plane/reports"
@@ -58,17 +68,28 @@ def alpha_elevate() -> dict:
     if obs_dir.is_dir():
         for f in obs_dir.glob("*.jsonl"):
             obs_count += sum(1 for _ in f.open(encoding="utf-8", errors="ignore"))
-    steps.append({"step": "observation_corpus", "ok": obs_count > 0, "count": obs_count})
+    steps.append(
+        {"step": "observation_corpus", "ok": obs_count > 0, "count": obs_count}
+    )
 
-    code, out = _run(["python3", "apex_nexus_coordinator.py", "status"], cwd=ALPHA, timeout=60)
+    code, out = _run(
+        ["python3", "apex_nexus_coordinator.py", "status"], cwd=ALPHA, timeout=60
+    )
     notion_online = "NOTION SYNC: ONLINE" in out
-    steps.append({"step": "nexus_status", "ok": code == 0, "notion_online": notion_online})
+    steps.append(
+        {"step": "nexus_status", "ok": code == 0, "notion_online": notion_online}
+    )
 
     # MCP smoke via filesystem dispatch
     code, out = _run(["python3", "scripts/apex_mcp_smoke.py"], cwd=ALPHA, timeout=30)
     steps.append({"step": "filesystem_mcp_smoke", "ok": code == 0 and "SHA256" in out})
 
-    return {"strand": "alpha", "steps": steps, "observations": obs_count, "notion_online": notion_online}
+    return {
+        "strand": "alpha",
+        "steps": steps,
+        "observations": obs_count,
+        "notion_online": notion_online,
+    }
 
 
 def omega_elevate(start_daemon: bool) -> dict:
@@ -76,8 +97,18 @@ def omega_elevate(start_daemon: bool) -> dict:
 
     alpha_link = OMEGA / "ORBIT_ALPHA_CONNECTIONS"
     hydra_link = OMEGA / "HYDRA_SHIELD_ENGINE"
-    steps.append({"step": "alpha_orbit_link", "ok": alpha_link.is_symlink() and alpha_link.resolve().is_dir()})
-    steps.append({"step": "hydra_shield_link", "ok": hydra_link.is_symlink() and hydra_link.resolve().is_dir()})
+    steps.append(
+        {
+            "step": "alpha_orbit_link",
+            "ok": alpha_link.is_symlink() and alpha_link.resolve().is_dir(),
+        }
+    )
+    steps.append(
+        {
+            "step": "hydra_shield_link",
+            "ok": hydra_link.is_symlink() and hydra_link.resolve().is_dir(),
+        }
+    )
 
     pid_file = HOME / ".apex/omega_orchestrator.pid"
     already_running = False
@@ -101,6 +132,7 @@ def omega_elevate(start_daemon: bool) -> dict:
             env={**os.environ},
         )
         import time
+
         for _ in range(10):
             if (HOME / ".apex/omega_orchestrator_status.json").is_file():
                 break
@@ -108,7 +140,9 @@ def omega_elevate(start_daemon: bool) -> dict:
         already_running = pid_file.is_file()
         steps.append({"step": "daemon_start", "ok": already_running})
     else:
-        code, _ = _run(["python3", str(OMEGA / "orchestrator_daemon.py")], cwd=OMEGA, timeout=30)
+        code, _ = _run(
+            ["python3", str(OMEGA / "orchestrator_daemon.py")], cwd=OMEGA, timeout=30
+        )
         steps.append({"step": "orchestrator_boot", "ok": code == 0})
 
     status_file = HOME / ".apex/omega_orchestrator_status.json"
@@ -121,7 +155,12 @@ def omega_elevate(start_daemon: bool) -> dict:
             pass
     steps.append({"step": "piston_status", "ok": pistons >= 12, "online": pistons})
 
-    return {"strand": "omega", "steps": steps, "pistons_online": pistons, "daemon": already_running or start_daemon}
+    return {
+        "strand": "omega",
+        "steps": steps,
+        "pistons_online": pistons,
+        "daemon": already_running or start_daemon,
+    }
 
 
 def write_capabilities(alpha: dict, omega: dict) -> None:
@@ -134,8 +173,8 @@ def write_capabilities(alpha: dict, omega: dict) -> None:
 
 | Strand | Grade | Detail |
 |--------|-------|--------|
-| Alpha | Highest | Control plane strict PASS, tests PASS, {alpha.get('observations', 0)} observations |
-| Omega | Highest | {omega.get('pistons_online', 0)}/12 pistons, daemon={'yes' if omega.get('daemon') else 'once'} |
+| Alpha | Highest | Control plane strict PASS, tests PASS, {alpha.get("observations", 0)} observations |
+| Omega | Highest | {omega.get("pistons_online", 0)}/12 pistons, daemon={"yes" if omega.get("daemon") else "once"} |
 | Nexus Notion | {notion} | Live status from nexus coordinator |
 
 ## Contract chain
@@ -161,8 +200,12 @@ python3 orchestrator_daemon.py --daemon   # Omega persistent
 def main() -> int:
     import argparse
 
-    ap = argparse.ArgumentParser(description="Elevate FS Commander Alpha+Omega to highest form")
-    ap.add_argument("--no-daemon", action="store_true", help="Skip starting omega --daemon")
+    ap = argparse.ArgumentParser(
+        description="Elevate FS Commander Alpha+Omega to highest form"
+    )
+    ap.add_argument(
+        "--no-daemon", action="store_true", help="Skip starting omega --daemon"
+    )
     args = ap.parse_args()
 
     print("=" * 56)
@@ -172,12 +215,16 @@ def main() -> int:
     print("\n[alpha] elevating observation + control plane + tests...")
     alpha = alpha_elevate()
     alpha_ok = sum(1 for s in alpha["steps"] if s.get("ok"))
-    print(f"  {alpha_ok}/{len(alpha['steps'])} steps OK | observations={alpha.get('observations', 0)}")
+    print(
+        f"  {alpha_ok}/{len(alpha['steps'])} steps OK | observations={alpha.get('observations', 0)}"
+    )
 
     print("\n[omega] elevating orchestrator + shield links...")
     omega = omega_elevate(start_daemon=not args.no_daemon)
     omega_ok = sum(1 for s in omega["steps"] if s.get("ok"))
-    print(f"  {omega_ok}/{len(omega['steps'])} steps OK | pistons={omega.get('pistons_online', 0)}")
+    print(
+        f"  {omega_ok}/{len(omega['steps'])} steps OK | pistons={omega.get('pistons_online', 0)}"
+    )
 
     write_capabilities(alpha, omega)
 

@@ -28,7 +28,9 @@ def load_key() -> str:
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     key = os.environ.get("NOTION_API_KEY", "")
     if not key:
-        raise SystemExit("NOTION_API_KEY missing — refresh at notion.so/my-integrations")
+        raise SystemExit(
+            "NOTION_API_KEY missing — refresh at notion.so/my-integrations"
+        )
     return key
 
 
@@ -36,11 +38,17 @@ def create_page(token: str, parent_id: str, title: str, markdown: str) -> str:
     # Notion API: split markdown into 2000-char rich_text chunks (simplified)
     children = []
     for i in range(0, len(markdown), 1900):
-        children.append({
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {"rich_text": [{"type": "text", "text": {"content": markdown[i : i + 1900]}}]},
-        })
+        children.append(
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {"type": "text", "text": {"content": markdown[i : i + 1900]}}
+                    ]
+                },
+            }
+        )
         if len(children) >= 90:
             break
     body = {
@@ -73,8 +81,10 @@ def main() -> int:
             path = month_dir / doc
             if not path.is_file():
                 continue
-            title = f"ChatGPT {month_dir.name} — {doc.replace('.md','')}"
-            pid = create_page(token, args.parent, title, path.read_text(encoding="utf-8"))
+            title = f"ChatGPT {month_dir.name} — {doc.replace('.md', '')}"
+            pid = create_page(
+                token, args.parent, title, path.read_text(encoding="utf-8")
+            )
             print(f"Created {title} -> {pid}")
     return 0
 

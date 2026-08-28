@@ -144,11 +144,13 @@ class OperatorKeyVault:
                 "email": self._g("MEM0_REG_EMAIL"),
             },
             "additional_keys": [
-                k for k in (
+                k
+                for k in (
                     self._g("MEM0_API_KEY_ALT1"),
                     self._g("MEM0_API_KEY_ALT2"),
                     self._g("MEM0_API_KEY_ALT3"),
-                ) if k
+                )
+                if k
             ],
         }
 
@@ -157,7 +159,8 @@ class OperatorKeyVault:
             "primary": self._g("SUPERMEMORY_API_KEY"),
             "secondary": self._g("SUPERMEMORY_API_KEY_SECONDARY"),
             "tertiary": self._g("SUPERMEMORY_API_KEY_TERTIARY"),
-            "mcp_url": self._g("SUPERMEMORY_MCP_URL") or "https://api.supermemory.ai/mcp",
+            "mcp_url": self._g("SUPERMEMORY_MCP_URL")
+            or "https://api.supermemory.ai/mcp",
         }
 
     def get_memory_plugin_keys(self) -> dict[str, str]:
@@ -190,7 +193,10 @@ class OperatorKeyVault:
         }
 
     def get_groq_keys(self) -> dict[str, str]:
-        return {"primary": self._g("GROQ_API_KEY"), "secondary": self._g("GROQ_API_KEY_SECONDARY")}
+        return {
+            "primary": self._g("GROQ_API_KEY"),
+            "secondary": self._g("GROQ_API_KEY_SECONDARY"),
+        }
 
     def get_deepseek_keys(self) -> dict[str, str]:
         return {
@@ -277,7 +283,10 @@ class OperatorKeyVault:
         }
 
     def get_gitlab_keys(self) -> dict[str, str]:
-        return {"pat": self._g("GITLAB_TOKEN"), "feed_token": self._g("GITLAB_FEED_TOKEN")}
+        return {
+            "pat": self._g("GITLAB_TOKEN"),
+            "feed_token": self._g("GITLAB_FEED_TOKEN"),
+        }
 
     def get_cursor_keys(self) -> dict[str, str]:
         return {"api_key": self._g("CURSOR_API_KEY")}
@@ -286,13 +295,19 @@ class OperatorKeyVault:
         return {"api_key": self._g("CODY_API_KEY")}
 
     def get_warp_keys(self) -> dict[str, str]:
-        return {"primary": self._g("WARP_API_KEY"), "secondary": self._g("WARP_API_KEY_SECONDARY")}
+        return {
+            "primary": self._g("WARP_API_KEY"),
+            "secondary": self._g("WARP_API_KEY_SECONDARY"),
+        }
 
     def get_vercel_keys(self) -> dict[str, str]:
         return {"token": self._g("VERCEL_TOKEN")}
 
     def get_render_keys(self) -> dict[str, str]:
-        return {"primary": self._g("RENDER_API_KEY"), "secondary": self._g("RENDER_API_KEY_SECONDARY")}
+        return {
+            "primary": self._g("RENDER_API_KEY"),
+            "secondary": self._g("RENDER_API_KEY_SECONDARY"),
+        }
 
     def get_railway_keys(self) -> dict[str, str]:
         return {"api_key": self._g("RAILWAY_API_KEY")}
@@ -307,7 +322,10 @@ class OperatorKeyVault:
         return {"postgres_url": self._g("PRISMA_POSTGRES_URL")}
 
     def get_pinecone_keys(self) -> dict[str, str]:
-        return {"primary": self._g("PINECONE_API_KEY"), "higuy_key": self._g("PINECONE_API_KEY_HIGUY")}
+        return {
+            "primary": self._g("PINECONE_API_KEY"),
+            "higuy_key": self._g("PINECONE_API_KEY_HIGUY"),
+        }
 
     def get_neo4j_keys(self) -> dict[str, str]:
         return {"api_key": self._g("NEO4J_API_KEY")}
@@ -366,9 +384,9 @@ class OperatorKeyVault:
         VAULT_DIR.mkdir(parents=True, exist_ok=True)
         st = self.status()
         payload = {
-            "at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            ).isoformat(),
+            "at": __import__("datetime")
+            .datetime.now(__import__("datetime").timezone.utc)
+            .isoformat(),
             "total_keys": st["env_key_count"],
             "services_loaded": st["services_loaded"],
             "vault_path": str(self.env_path),
@@ -394,7 +412,9 @@ def main() -> int:
     ap.add_argument("--manifest", action="store_true")
     ap.add_argument("--has", metavar="SERVICE")
     ap.add_argument("--check-github", action="store_true")
-    ap.add_argument("--try-tokens", action="store_true", help="Try GITHUB_TOKEN* until one works")
+    ap.add_argument(
+        "--try-tokens", action="store_true", help="Try GITHUB_TOKEN* until one works"
+    )
     args = ap.parse_args()
 
     vault = OperatorKeyVault()
@@ -409,8 +429,13 @@ def main() -> int:
     if args.check_github or args.try_tokens:
         candidates = []
         for k in (
-            "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN_PAT1", "GITHUB_TOKEN_PAT2",
-            "GITHUB_TOKEN_PAT3", "GITHUB_TOKEN_BEME", "GITHUB_TOKEN_S41Z",
+            "GITHUB_TOKEN",
+            "GH_TOKEN",
+            "GITHUB_TOKEN_PAT1",
+            "GITHUB_TOKEN_PAT2",
+            "GITHUB_TOKEN_PAT3",
+            "GITHUB_TOKEN_BEME",
+            "GITHUB_TOKEN_S41Z",
             "GITHUB_TOKEN_FORENSICS",
         ):
             v = vault._g(k)
@@ -432,17 +457,23 @@ def main() -> int:
                 # promote working token
                 vault._env["GITHUB_TOKEN"] = tok
                 os.environ["GITHUB_TOKEN"] = tok
-                print(json.dumps({
-                    "github": True,
-                    "login": data.get("login"),
-                    "id": data.get("id"),
-                    "token_index": i,
-                }))
+                print(
+                    json.dumps(
+                        {
+                            "github": True,
+                            "login": data.get("login"),
+                            "id": data.get("id"),
+                            "token_index": i,
+                        }
+                    )
+                )
                 return 0
             except Exception as e:
                 last_err = type(e).__name__
                 continue
-        print(json.dumps({"github": False, "reason": last_err, "tried": len(candidates)}))
+        print(
+            json.dumps({"github": False, "reason": last_err, "tried": len(candidates)})
+        )
         return 1
 
     print(json.dumps(vault.status(), indent=2))

@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import re
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -91,10 +90,17 @@ def _load_token() -> str:
             k, v = line[7:].split("=", 1)
             if k.startswith("GITHUB_"):
                 found[k] = v.strip().strip('"').strip("'")
-    for key in ("GITHUB_TOKEN_PRIMARY", "GITHUB_MASTER_TOKEN", "GITHUB_PAT", "GITHUB_TOKEN"):
+    for key in (
+        "GITHUB_TOKEN_PRIMARY",
+        "GITHUB_MASTER_TOKEN",
+        "GITHUB_PAT",
+        "GITHUB_TOKEN",
+    ):
         if found.get(key):
             return found[key]
-    token = os.environ.get("GITHUB_TOKEN_PRIMARY") or os.environ.get("GITHUB_TOKEN") or ""
+    token = (
+        os.environ.get("GITHUB_TOKEN_PRIMARY") or os.environ.get("GITHUB_TOKEN") or ""
+    )
     if token:
         return token
     raise SystemExit("No GITHUB_TOKEN — set GITHUB_TOKEN_PRIMARY in gatekeeper.env")
@@ -121,13 +127,13 @@ def _api(token: str, method: str, path: str, body: dict | None = None) -> dict |
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
             if e.code in (403, 429) and attempt < 3:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
                 continue
             detail = e.read().decode("utf-8", errors="replace")[:300]
             raise RuntimeError(f"GitHub API {e.code}: {detail}") from e
         except Exception:
             if attempt < 3:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
                 continue
             raise
     return {}
@@ -168,7 +174,8 @@ def discover_repos(token: str, mode: str) -> list[str]:
 
     if mode == "private":
         return sorted(
-            name for name, row in by_name.items()
+            name
+            for name, row in by_name.items()
             if row.get("private") and not row.get("archived")
         )
 
@@ -266,19 +273,23 @@ def wire_repo(token: str, repo: str) -> dict:
         if existing:
             updated = update_hook(token, repo, existing["id"])
             ping_hook(token, repo, existing["id"])
-            entry.update({
-                "status": "updated",
-                "hook_id": existing["id"],
-                "events": updated.get("events", EVENTS),
-            })
+            entry.update(
+                {
+                    "status": "updated",
+                    "hook_id": existing["id"],
+                    "events": updated.get("events", EVENTS),
+                }
+            )
         else:
             created = create_hook(token, repo)
             ping_hook(token, repo, created["id"])
-            entry.update({
-                "status": "created",
-                "hook_id": created["id"],
-                "events": created.get("events", EVENTS),
-            })
+            entry.update(
+                {
+                    "status": "created",
+                    "hook_id": created["id"],
+                    "events": created.get("events", EVENTS),
+                }
+            )
     except Exception as e:
         entry.update({"status": "error", "detail": str(e)[:200]})
     time.sleep(0.35)
@@ -286,7 +297,9 @@ def wire_repo(token: str, repo: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Wire GlacierEQ repos to Notion GitHub worker")
+    parser = argparse.ArgumentParser(
+        description="Wire GlacierEQ repos to Notion GitHub worker"
+    )
     parser.add_argument(
         "--mode",
         choices=("core", "max", "private", "all"),
@@ -310,21 +323,42 @@ def main() -> int:
         entry = wire_repo(token, repo)
         results.append(entry)
         mark = entry["status"].upper()
-        suffix = f" hook={entry.get('hook_id')}" if entry.get("hook_id") else f" — {entry.get('detail', '')}"
+        suffix = (
+            f" hook={entry.get('hook_id')}"
+            if entry.get("hook_id")
+            else f" — {entry.get('detail', '')}"
+        )
         print(f"[{mark}] {entry['repo']}{suffix}")
 
     try:
         owner_rows = _paginate(token, "/user/repos?affiliation=owner&sort=pushed")
         glacier = {
-            r["name"]: r for r in owner_rows
+            r["name"]: r
+            for r in owner_rows
             if r.get("owner", {}).get("login", "").lower() == OWNER.lower()
         }
-        wired_ok = [r["repo"].split("/", 1)[1] for r in results if r["status"] in ("created", "updated")]
+        wired_ok = [
+            r["repo"].split("/", 1)[1]
+            for r in results
+            if r["status"] in ("created", "updated")
+        ]
         visibility = {
-            "private_wired": sum(1 for n in wired_ok if glacier.get(n, {}).get("private")),
-            "public_wired": sum(1 for n in wired_ok if n in glacier and not glacier[n].get("private")),
-            "private_total_owner": sum(1 for r in glacier.values() if r.get("private") and not r.get("archived")),
-            "public_total_owner": sum(1 for r in glacier.values() if not r.get("private") and not r.get("archived")),
+            "private_wired": sum(
+                1 for n in wired_ok if glacier.get(n, {}).get("private")
+            ),
+            "public_wired": sum(
+                1 for n in wired_ok if n in glacier and not glacier[n].get("private")
+            ),
+            "private_total_owner": sum(
+                1
+                for r in glacier.values()
+                if r.get("private") and not r.get("archived")
+            ),
+            "public_total_owner": sum(
+                1
+                for r in glacier.values()
+                if not r.get("private") and not r.get("archived")
+            ),
         }
     except Exception:
         visibility = {}
@@ -346,7 +380,9 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(f"\nManifest: {OUT}")
-    print(f"OK {payload['stats']['ok']}/{len(repos)} | errors {payload['stats']['errors']}")
+    print(
+        f"OK {payload['stats']['ok']}/{len(repos)} | errors {payload['stats']['errors']}"
+    )
     return 0 if payload["stats"]["errors"] == 0 else 1
 
 

@@ -40,9 +40,18 @@ ENV_SOURCES = [
 KEY_ALIASES: dict[str, list[str]] = {
     "mem0_pro": ["MEM0_PRO_API_KEY", "MEM0_PRO", "MEM0_API_KEY", "MEM_API_KEY"],
     "mem0_reg": ["MEM0_REG_API_KEY", "MEM0_HI1", "MEM0GLACIEREQ"],
-    "supermemory": ["SUPERMEMORY_PRIMARY_KEY", "SUPERMEMORY_KEY", "SUPERMEMORY_API_KEY", "SUPERMEMORY"],
+    "supermemory": [
+        "SUPERMEMORY_PRIMARY_KEY",
+        "SUPERMEMORY_KEY",
+        "SUPERMEMORY_API_KEY",
+        "SUPERMEMORY",
+    ],
     "memory_global": ["MEMORY_GLOBAL_KEY", "MEMORY_PLUGIN_PRIMARY", "MEMORY_PLUGIN"],
-    "memory_direct": ["MEMORY_DIRECT_KEY", "MEMORY_PLUGIN_SPECIALIZED", "MEMORY_PLUGIN_2_EVIDENCE"],
+    "memory_direct": [
+        "MEMORY_DIRECT_KEY",
+        "MEMORY_PLUGIN_SPECIALIZED",
+        "MEMORY_PLUGIN_2_EVIDENCE",
+    ],
     "pinecone": ["PINECONE_PRIMARY_KEY", "PINECONE_API_KEY", "PINECONE"],
     "qdrant": ["QDRANT_KEY", "QDRANT"],
     "context7": ["CONTEXT7", "CONTEXT7_API_KEY"],
@@ -134,7 +143,9 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower().strip())[:500]
 
 
-def pack_results(items: list[dict[str, Any]], top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
+def pack_results(
+    items: list[dict[str, Any]], top_k: int = DEFAULT_TOP_K
+) -> list[dict[str, Any]]:
     items = dedupe_items(items)
     items.sort(key=lambda x: float(x.get("score", 0)), reverse=True)
     return items[:top_k]
@@ -142,13 +153,18 @@ def pack_results(items: list[dict[str, Any]], top_k: int = DEFAULT_TOP_K) -> lis
 
 # ─── Mem0 (delegates to mem0_master_apex) ───────────────────────────────────
 
+
 def _mem0_master(account: str, user_id: str, agent_id: str = "apex-grok"):
     import sys
+
     scripts = HOME / "scripts"
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
     from mem0_master_apex import Mem0Master, Mem0Scope
-    return Mem0Master(account=account, scope=Mem0Scope(user_id=user_id, agent_id=agent_id))  # type: ignore
+
+    return Mem0Master(
+        account=account, scope=Mem0Scope(user_id=user_id, agent_id=agent_id)
+    )  # type: ignore
 
 
 async def mem0_search(
@@ -167,12 +183,21 @@ async def mem0_search(
 
     try:
         m = _mem0_master(account, user_id, agent_id)
-        results = await asyncio.to_thread(m.search, query, top_k=top_k, rerank=True, threshold=0.3)
+        results = await asyncio.to_thread(
+            m.search, query, top_k=top_k, rerank=True, threshold=0.3
+        )
         out = []
         for r in results or []:
             text = (r.get("memory") or r.get("text") or r.get("content") or "").strip()
             if text:
-                out.append({"layer": "mem0", "source": "[M]", "text": truncate(text), "score": float(r.get("score", 0.5))})
+                out.append(
+                    {
+                        "layer": "mem0",
+                        "source": "[M]",
+                        "text": truncate(text),
+                        "score": float(r.get("score", 0.5)),
+                    }
+                )
         set_cache(cache_key, json.dumps(out))
         return out
     except Exception as e:
@@ -198,32 +223,54 @@ async def mem0_add(
 
 # ─── Supermemory ────────────────────────────────────────────────────────────
 
+
 def _supermemory_cli_search(query: str, top_k: int) -> list[dict[str, Any]]:
     tag = os.environ.get("SUPERMEMORY_TAG", "apex-home")
     try:
         proc = subprocess.run(
-            ["supermemory", "search", query, "--tag", tag, "--limit", str(top_k), "--mode", "hybrid", "--rerank", "--json"],
-            capture_output=True, text=True, timeout=45, cwd=str(HOME),
+            [
+                "supermemory",
+                "search",
+                query,
+                "--tag",
+                tag,
+                "--limit",
+                str(top_k),
+                "--mode",
+                "hybrid",
+                "--rerank",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            cwd=str(HOME),
         )
         if proc.returncode != 0:
-            return [{"layer": "supermemory", "error": proc.stderr[:200] or "cli_failed"}]
+            return [
+                {"layer": "supermemory", "error": proc.stderr[:200] or "cli_failed"}
+            ]
         data = json.loads(proc.stdout)
         out = []
         for r in data.get("results", []):
             text = (r.get("memory") or r.get("content") or "").strip()
             if text:
-                out.append({
-                    "layer": "supermemory",
-                    "source": "[S]",
-                    "text": truncate(text),
-                    "score": float(r.get("similarity", 0.5)),
-                })
+                out.append(
+                    {
+                        "layer": "supermemory",
+                        "source": "[S]",
+                        "text": truncate(text),
+                        "score": float(r.get("similarity", 0.5)),
+                    }
+                )
         return out
     except Exception as e:
         return [{"layer": "supermemory", "error": str(e)[:200]}]
 
 
-async def supermemory_search(query: str, top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
+async def supermemory_search(
+    query: str, top_k: int = DEFAULT_TOP_K
+) -> list[dict[str, Any]]:
     cache_key = f"supermemory:{_query_hash(query)}"
     if cached := get_cache().get(cache_key):
         return json.loads(cached)
@@ -239,20 +286,30 @@ async def supermemory_add(fact: str) -> dict[str, Any]:
     try:
         proc = subprocess.run(
             ["supermemory", "remember", truncate(fact), "--tag", tag, "--static"],
-            capture_output=True, text=True, timeout=45, cwd=str(HOME),
+            capture_output=True,
+            text=True,
+            timeout=45,
+            cwd=str(HOME),
         )
-        return {"ok": proc.returncode == 0, "layer": "supermemory", "detail": (proc.stdout or proc.stderr)[:300]}
+        return {
+            "ok": proc.returncode == 0,
+            "layer": "supermemory",
+            "detail": (proc.stdout or proc.stderr)[:300],
+        }
     except Exception as e:
         return {"ok": False, "layer": "supermemory", "error": str(e)[:200]}
 
 
 # ─── Memory Plugin ──────────────────────────────────────────────────────────
 
+
 def _memory_plugin_config() -> tuple[str, str, str]:
     source_memory_env()
     base = (
         os.environ.get("MEMORY_PLUGIN_ENDPOINT")
-        or os.environ.get("CONST_MP_MEMORY_ENDPOINT", "").replace("MP_API + ", "").split("?")[0]
+        or os.environ.get("CONST_MP_MEMORY_ENDPOINT", "")
+        .replace("MP_API + ", "")
+        .split("?")[0]
         or "https://memory.glaciereq.app"
     )
     if not base.startswith("http"):
@@ -276,7 +333,11 @@ async def memory_plugin_search(
     if cached := get_cache().get(cache_key):
         return json.loads(cached)
 
-    key = resolve_key("memory_global") if account == "global" else resolve_key("memory_direct")
+    key = (
+        resolve_key("memory_global")
+        if account == "global"
+        else resolve_key("memory_direct")
+    )
     if not key:
         return [{"layer": "memory_plugin", "error": "no_account_key"}]
 
@@ -289,16 +350,31 @@ async def memory_plugin_search(
     body = {"query": query, "limit": top_k}
     for url in endpoints:
         try:
-            async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with session.post(
+                url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
+            ) as resp:
                 if resp.status != 200:
                     continue
                 data = await resp.json()
-                items = data if isinstance(data, list) else data.get("results", data.get("memories", data.get("data", [])))
+                items = (
+                    data
+                    if isinstance(data, list)
+                    else data.get("results", data.get("memories", data.get("data", [])))
+                )
                 out = []
                 for r in items or []:
-                    text = (r.get("content") or r.get("memory") or r.get("text") or "").strip()
+                    text = (
+                        r.get("content") or r.get("memory") or r.get("text") or ""
+                    ).strip()
                     if text:
-                        out.append({"layer": "memory_plugin", "source": "[MP]", "text": truncate(text), "score": float(r.get("score", 0.5))})
+                        out.append(
+                            {
+                                "layer": "memory_plugin",
+                                "source": "[MP]",
+                                "text": truncate(text),
+                                "score": float(r.get("score", 0.5)),
+                            }
+                        )
                 if out:
                     set_cache(cache_key, json.dumps(out))
                     return out
@@ -314,14 +390,20 @@ async def memory_plugin_add(
     account: str = "global",
 ) -> dict[str, Any]:
     base, _, _ = _memory_plugin_config()
-    key = resolve_key("memory_global") if account == "global" else resolve_key("memory_direct")
+    key = (
+        resolve_key("memory_global")
+        if account == "global"
+        else resolve_key("memory_direct")
+    )
     if not key:
         return {"ok": False, "layer": "memory_plugin", "error": "no_api_key"}
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     body = {"content": truncate(fact), "type": "fact"}
     for url in (f"{base}/api/v2/memory", f"{base}/v2/memory", f"{base}/api/memory"):
         try:
-            async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with session.post(
+                url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
+            ) as resp:
                 if resp.status in (200, 201):
                     return {"ok": True, "layer": "memory_plugin", "status": resp.status}
         except Exception:
@@ -331,23 +413,40 @@ async def memory_plugin_add(
 
 # ─── Embeddings (shared Pinecone + Qdrant) ──────────────────────────────────
 
+
 async def embed_query(session: aiohttp.ClientSession, query: str) -> list[float] | None:
     openai_key = resolve_key("openai_embed")
     if openai_key and not openai_key.startswith("co-"):
         url = "https://api.openai.com/v1/embeddings"
-        headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {openai_key}",
+            "Content-Type": "application/json",
+        }
         body = {"input": [query], "model": "text-embedding-ada-002"}
-        async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+        async with session.post(
+            url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
             if resp.status == 200:
                 data = await resp.json()
                 return data["data"][0]["embedding"]
 
-    cohere_key = os.environ.get("BDDDE66_COHERE_API_KEY") or os.environ.get("COHERE_API_KEY")
+    cohere_key = os.environ.get("BDDDE66_COHERE_API_KEY") or os.environ.get(
+        "COHERE_API_KEY"
+    )
     if cohere_key:
         url = "https://api.cohere.com/v1/embed"
-        headers = {"Authorization": f"Bearer {cohere_key}", "Content-Type": "application/json"}
-        body = {"texts": [query], "model": "embed-english-v3.0", "input_type": "search_query"}
-        async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+        headers = {
+            "Authorization": f"Bearer {cohere_key}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "texts": [query],
+            "model": "embed-english-v3.0",
+            "input_type": "search_query",
+        }
+        async with session.post(
+            url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
             if resp.status == 200:
                 data = await resp.json()
                 emb = data.get("embeddings", [[]])[0]
@@ -358,7 +457,10 @@ async def embed_query(session: aiohttp.ClientSession, query: str) -> list[float]
 
 # ─── Pinecone ───────────────────────────────────────────────────────────────
 
-async def pinecone_search(session: aiohttp.ClientSession, query: str, top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
+
+async def pinecone_search(
+    session: aiohttp.ClientSession, query: str, top_k: int = DEFAULT_TOP_K
+) -> list[dict[str, Any]]:
     cache_key = f"pinecone:{_query_hash(query)}"
     if cached := get_cache().get(cache_key):
         return json.loads(cached)
@@ -368,11 +470,16 @@ async def pinecone_search(session: aiohttp.ClientSession, query: str, top_k: int
     if not pc_key or not vector:
         return [{"layer": "pinecone", "error": "missing_key_or_embedding"}]
 
-    host = os.environ.get("PINECONE_HOST") or "apex-main-xwjbbs7.svc.aped-4627-b74a.pinecone.io"
+    host = (
+        os.environ.get("PINECONE_HOST")
+        or "apex-main-xwjbbs7.svc.aped-4627-b74a.pinecone.io"
+    )
     url = f"https://{host}/query"
     headers = {"Api-Key": pc_key, "Content-Type": "application/json"}
     body = {"vector": vector, "topK": top_k, "includeMetadata": True}
-    async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+    async with session.post(
+        url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+    ) as resp:
         if resp.status != 200:
             return [{"layer": "pinecone", "error": f"status_{resp.status}"}]
         data = await resp.json()
@@ -383,12 +490,20 @@ async def pinecone_search(session: aiohttp.ClientSession, query: str, top_k: int
             meta = m.get("metadata") or {}
             text = (meta.get("text") or meta.get("content") or "").strip()
             if text:
-                out.append({"layer": "pinecone", "source": "[PC]", "text": truncate(text), "score": float(m.get("score", 0))})
+                out.append(
+                    {
+                        "layer": "pinecone",
+                        "source": "[PC]",
+                        "text": truncate(text),
+                        "score": float(m.get("score", 0)),
+                    }
+                )
         set_cache(cache_key, json.dumps(out))
         return out
 
 
 # ─── Qdrant ─────────────────────────────────────────────────────────────────
+
 
 def _qdrant_base_url() -> str | None:
     endpoint = os.environ.get("QDRANT_ENDPOINT", "").strip().rstrip("/")
@@ -400,7 +515,9 @@ def _qdrant_base_url() -> str | None:
     return f"{scheme}://{host}:{port}"
 
 
-async def qdrant_search(session: aiohttp.ClientSession, query: str, top_k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
+async def qdrant_search(
+    session: aiohttp.ClientSession, query: str, top_k: int = DEFAULT_TOP_K
+) -> list[dict[str, Any]]:
     cache_key = f"qdrant:{_query_hash(query)}"
     if cached := get_cache().get(cache_key):
         return json.loads(cached)
@@ -434,9 +551,17 @@ async def qdrant_search(session: aiohttp.ClientSession, query: str, top_k: int =
         headers["api-key"] = api_key
     body = {"vector": vector, "limit": top_k, "with_payload": True}
     try:
-        async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+        async with session.post(
+            url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
+        ) as resp:
             if resp.status != 200:
-                return [{"layer": "qdrant", "error": f"status_{resp.status}", "detail": (await resp.text())[:200]}]
+                return [
+                    {
+                        "layer": "qdrant",
+                        "error": f"status_{resp.status}",
+                        "detail": (await resp.text())[:200],
+                    }
+                ]
             data = await resp.json()
             out = []
             for pt in data.get("result", []):
@@ -444,7 +569,14 @@ async def qdrant_search(session: aiohttp.ClientSession, query: str, top_k: int =
                 text = (payload.get("text") or payload.get("content") or "").strip()
                 score = float(pt.get("score", 0))
                 if text and score >= SIMILARITY_THRESHOLD:
-                    out.append({"layer": "qdrant", "source": "[QD]", "text": truncate(text), "score": score})
+                    out.append(
+                        {
+                            "layer": "qdrant",
+                            "source": "[QD]",
+                            "text": truncate(text),
+                            "score": score,
+                        }
+                    )
             set_cache(cache_key, json.dumps(out))
             return out
     except (aiohttp.ClientError, OSError) as e:
@@ -453,7 +585,10 @@ async def qdrant_search(session: aiohttp.ClientSession, query: str, top_k: int =
 
 # ─── Context7 ───────────────────────────────────────────────────────────────
 
-async def context7_search(session: aiohttp.ClientSession, query: str, top_k: int = 3) -> list[dict[str, Any]]:
+
+async def context7_search(
+    session: aiohttp.ClientSession, query: str, top_k: int = 3
+) -> list[dict[str, Any]]:
     key = resolve_key("context7")
     if not key:
         return [{"layer": "context7", "error": "no_api_key"}]
@@ -464,31 +599,58 @@ async def context7_search(session: aiohttp.ClientSession, query: str, top_k: int
 
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     endpoints = [
-        ("GET", f"https://context7.com/api/v1/search?query={query}&limit={top_k}", None),
-        ("POST", "https://context7.com/api/v1/search", {"query": query, "limit": top_k}),
-        ("POST", "https://api.context7.com/v1/search", {"query": query, "limit": top_k}),
+        (
+            "GET",
+            f"https://context7.com/api/v1/search?query={query}&limit={top_k}",
+            None,
+        ),
+        (
+            "POST",
+            "https://context7.com/api/v1/search",
+            {"query": query, "limit": top_k},
+        ),
+        (
+            "POST",
+            "https://api.context7.com/v1/search",
+            {"query": query, "limit": top_k},
+        ),
     ]
     for method, url, body in endpoints:
         try:
-            kwargs: dict[str, Any] = {"headers": headers, "timeout": aiohttp.ClientTimeout(total=25)}
+            kwargs: dict[str, Any] = {
+                "headers": headers,
+                "timeout": aiohttp.ClientTimeout(total=25),
+            }
             if method == "POST" and body:
                 kwargs["json"] = body
             async with session.request(method, url, **kwargs) as resp:
                 if resp.status != 200:
                     continue
                 data = await resp.json()
-                items = data if isinstance(data, list) else data.get("results", data.get("data", []))
+                items = (
+                    data
+                    if isinstance(data, list)
+                    else data.get("results", data.get("data", []))
+                )
                 out = []
                 for r in items or []:
-                    text = (r.get("content") or r.get("snippet") or r.get("text") or r.get("title") or "").strip()
+                    text = (
+                        r.get("content")
+                        or r.get("snippet")
+                        or r.get("text")
+                        or r.get("title")
+                        or ""
+                    ).strip()
                     if text:
-                        out.append({
-                            "layer": "context7",
-                            "source": "[C7]",
-                            "text": truncate(text),
-                            "score": float(r.get("score", 0.6)),
-                            "library": r.get("library", r.get("id", "")),
-                        })
+                        out.append(
+                            {
+                                "layer": "context7",
+                                "source": "[C7]",
+                                "text": truncate(text),
+                                "score": float(r.get("score", 0.6)),
+                                "library": r.get("library", r.get("id", "")),
+                            }
+                        )
                 if out:
                     set_cache(cache_key, json.dumps(out))
                     return out[:top_k]
@@ -500,10 +662,44 @@ async def context7_search(session: aiohttp.ClientSession, query: str, top_k: int
 # ─── Unified router ───────────────────────────────────────────────────────────
 
 LAYER_KEYWORDS: dict[str, list[str]] = {
-    "context7": ["docs", "library", "api reference", "sdk", "framework", "npm", "pypi", "documentation"],
-    "pinecone": ["evidence", "legal", "precedent", "pdf", "document", "exhibit", "brief", "court", "law"],
-    "memory_plugin": ["session", "built", "discussed", "operator state", "cross-session", "plugin"],
-    "supermemory": ["link", "url", "repo", "github", "bookmark", "knowledge", "durable"],
+    "context7": [
+        "docs",
+        "library",
+        "api reference",
+        "sdk",
+        "framework",
+        "npm",
+        "pypi",
+        "documentation",
+    ],
+    "pinecone": [
+        "evidence",
+        "legal",
+        "precedent",
+        "pdf",
+        "document",
+        "exhibit",
+        "brief",
+        "court",
+        "law",
+    ],
+    "memory_plugin": [
+        "session",
+        "built",
+        "discussed",
+        "operator state",
+        "cross-session",
+        "plugin",
+    ],
+    "supermemory": [
+        "link",
+        "url",
+        "repo",
+        "github",
+        "bookmark",
+        "knowledge",
+        "durable",
+    ],
     "qdrant": ["local", "vector", "embedding", "collection", "indexed"],
     "mem0": [],  # default fallback
 }
@@ -579,7 +775,11 @@ async def add_unified(
                 results["supermemory"] = await supermemory_add(fact)
             elif t == "memory_plugin":
                 results["memory_plugin"] = await memory_plugin_add(session, fact)
-    return {"ok": any(r.get("ok") for r in results.values()), "results": results, "at": _now()}
+    return {
+        "ok": any(r.get("ok") for r in results.values()),
+        "results": results,
+        "at": _now(),
+    }
 
 
 def _layer_live(items: list[dict[str, Any]]) -> tuple[bool, str]:
@@ -607,7 +807,11 @@ async def _memory_plugin_ping(session: aiohttp.ClientSession) -> tuple[bool, str
     headers = {"Authorization": f"Bearer {key}"}
     for path in ("/health", "/api/health", "/api/v2/health", "/"):
         try:
-            async with session.get(f"{base}{path}", headers=headers, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+            async with session.get(
+                f"{base}{path}",
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=12),
+            ) as resp:
                 if resp.status in (200, 204):
                     return True, f"ok:{path}"
         except Exception:
@@ -639,7 +843,9 @@ async def health_check() -> dict[str, Any]:
 
         mp_live, mp_detail = await _memory_plugin_ping(session)
         status["layers"]["memory_plugin"] = {
-            "key_present": bool(resolve_key("memory_global") or resolve_key("memory_direct")),
+            "key_present": bool(
+                resolve_key("memory_global") or resolve_key("memory_direct")
+            ),
             "live": mp_live,
             "detail": mp_detail,
             "optional": True,
@@ -658,7 +864,9 @@ async def health_check() -> dict[str, Any]:
         qd_items = await qdrant_search(session, "health", top_k=1)
         qd_live, qd_detail = _layer_live(qd_items)
         status["layers"]["qdrant"] = {
-            "key_present": bool(resolve_key("qdrant") or os.environ.get("QDRANT_ENDPOINT")),
+            "key_present": bool(
+                resolve_key("qdrant") or os.environ.get("QDRANT_ENDPOINT")
+            ),
             "live": qd_live,
             "detail": qd_detail,
             "optional": True,
@@ -673,7 +881,8 @@ async def health_check() -> dict[str, Any]:
         }
 
     live_count = sum(
-        1 for v in status["layers"].values()
+        1
+        for v in status["layers"].values()
         if isinstance(v, dict) and v.get("live") is True
     )
     status["summary"] = {
@@ -729,7 +938,14 @@ def write_mesh_config(health: dict[str, Any]) -> Path:
         "version": "1.0",
         "at": _now(),
         "profile": "coremaximized",
-        "layers": ["mem0", "supermemory", "memory_plugin", "pinecone", "qdrant", "context7"],
+        "layers": [
+            "mem0",
+            "supermemory",
+            "memory_plugin",
+            "pinecone",
+            "qdrant",
+            "context7",
+        ],
         "routing": {
             "default": ["mem0", "supermemory", "memory_plugin"],
             "legal_evidence": ["pinecone", "mem0"],
@@ -751,7 +967,9 @@ def write_mesh_config(health: dict[str, Any]) -> Path:
         },
     }
     MESH_CONFIG.write_text(json.dumps(mesh, indent=2) + "\n", encoding="utf-8")
-    (APEX / "memory_layer_status.json").write_text(json.dumps(health, indent=2) + "\n", encoding="utf-8")
+    (APEX / "memory_layer_status.json").write_text(
+        json.dumps(health, indent=2) + "\n", encoding="utf-8"
+    )
     return MESH_CONFIG
 
 

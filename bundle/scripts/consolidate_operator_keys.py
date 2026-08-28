@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,7 +27,10 @@ SOURCES = [
     HOME / ".env",
 ]
 
-AG_CLI_EXTRACTED = HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/ag_cli_extracted.env"
+AG_CLI_EXTRACTED = (
+    HOME
+    / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/ag_cli_extracted.env"
+)
 MASTER_ENV = HOME / ".apex_vault/AGENTS/MASTER.env"
 SHARED_KEYS = HOME / ".apex_vault/AGENTS/SHARED_KEYS.env"
 
@@ -38,18 +40,23 @@ ENV4_CANDIDATES = [
     Path("/storage/emulated/0/Documents/environment4"),
     Path("/sdcard/Download/Environment4_Organized_Vault.md.txt"),
     Path("/sdcard/Documents/environment4"),
-    HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/environment4/Environment4_Organized_Vault.md.txt",
+    HOME
+    / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/environment4/Environment4_Organized_Vault.md.txt",
 ]
 
 KEEP_REGISTRY = HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep"
 
 KEEP_PATHS = [
     HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep_export/goohlekeep2026.txt",
-    HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep_export/Google_Keep_Document.txt",
-    HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep_export/Google_Keep_Document_1.txt",
+    HOME
+    / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep_export/Google_Keep_Document.txt",
+    HOME
+    / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/keep_export/Google_Keep_Document_1.txt",
 ]
 
-AUDIT_JSON = HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/operator_code_key_audit_final.json"
+AUDIT_JSON = (
+    HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/operator_code_key_audit_final.json"
+)
 
 # Map discovered prefixes / aliases → canonical env var
 ALIASES = {
@@ -70,28 +77,78 @@ ALIASES = {
 }
 
 # Canonical env vars we actually wire into the mesh
-CANONICAL_VARS = frozenset({
-    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN", "NOTION_API_KEY",
-    "MEM0_API_KEY", "SUPERMEMORY_API_KEY", "SUPERMEMORY_CODEX_API_KEY",
-    "GROQ_API_KEY", "GEMINI_API_KEY", "PINECONE_API_KEY", "COLOSSUS_API_KEY",
-    "COLOSSUS_MCP_URL", "COLOSSUS_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_KEY", "SUPABASE_ACCESS_TOKEN", "QDRANT_URL", "QDRANT_API_KEY",
-    "DEEPSEEK_API_KEY", "PERPLEXITY_API_KEY", "HUGGINGFACE_API_KEY",
-    "COURTLISTENER_API_KEY", "ELEVENLABS_API_KEY", "MEMORY_AUTH_TOKEN",
-    "MEMORY_PLUGIN_TOKEN", "SMITHERY_API_KEY", "E2B_API_KEY", "DROPBOX_KEY",
-    "DROPBOX_SECRET", "DROPBOX_APP_KEY", "DROPBOX_APP_SECRET", "DROPBOX_REFRESH_TOKEN",
-    "DROPBOX_ACCESS_TOKEN", "DROPBOX_TOKEN_PATH", "OPENROUTER_API_KEY",
-    "OPENROUTER_TOKEN", "LINEAR_API_KEY", "VERCEL_TOKEN", "XAI_API_KEY",
-    "NEO4J_URI", "NEO4J_PASSWORD", "NEO4J_USERNAME", "MEM0_ORG_ID",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SHADE_API_KEY", "CLOUDFLARE_ACCOUNT_ID",
-    "CLOUDFLARE_API_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT",
-    "MIMO_API_KEY", "MIMO_GLASS_API_KEY", "PARSEHUB_API_KEY", "TASKADE_API_KEY",
-    "HARPA_API_KEY", "ONEDRIVE_TOKEN_PATH", "GOOGLE_OAUTH_CLIENT_ID",
-    "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_PROJECT_ID", "GOOGLE_OAUTH_CLIENT_PATH",
-    "GOOGLE_CASEY_OAUTH_CLIENT_ID", "GOOGLE_SERVICE_ACCOUNT_GLACIER_PATH",
-    "GOOGLE_SERVICE_ACCOUNT_FIREBASE_PATH", "GOOGLE_SERVICE_ACCOUNT_CASEY_PATH",
-    "DROPBOX_ACCESS_TOKEN", "ONEDRIVE_ACCESS_TOKEN", "ONEDRIVE_DRIVE_ID",
-})
+CANONICAL_VARS = frozenset(
+    {
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GITHUB_TOKEN",
+        "NOTION_API_KEY",
+        "MEM0_API_KEY",
+        "SUPERMEMORY_API_KEY",
+        "SUPERMEMORY_CODEX_API_KEY",
+        "GROQ_API_KEY",
+        "GEMINI_API_KEY",
+        "PINECONE_API_KEY",
+        "COLOSSUS_API_KEY",
+        "COLOSSUS_MCP_URL",
+        "COLOSSUS_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "SUPABASE_ACCESS_TOKEN",
+        "QDRANT_URL",
+        "QDRANT_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "PERPLEXITY_API_KEY",
+        "HUGGINGFACE_API_KEY",
+        "COURTLISTENER_API_KEY",
+        "ELEVENLABS_API_KEY",
+        "MEMORY_AUTH_TOKEN",
+        "MEMORY_PLUGIN_TOKEN",
+        "SMITHERY_API_KEY",
+        "E2B_API_KEY",
+        "DROPBOX_KEY",
+        "DROPBOX_SECRET",
+        "DROPBOX_APP_KEY",
+        "DROPBOX_APP_SECRET",
+        "DROPBOX_REFRESH_TOKEN",
+        "DROPBOX_ACCESS_TOKEN",
+        "DROPBOX_TOKEN_PATH",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_TOKEN",
+        "LINEAR_API_KEY",
+        "VERCEL_TOKEN",
+        "XAI_API_KEY",
+        "NEO4J_URI",
+        "NEO4J_PASSWORD",
+        "NEO4J_USERNAME",
+        "MEM0_ORG_ID",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "SHADE_API_KEY",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_TOKEN",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_ENDPOINT",
+        "MIMO_API_KEY",
+        "MIMO_GLASS_API_KEY",
+        "PARSEHUB_API_KEY",
+        "TASKADE_API_KEY",
+        "HARPA_API_KEY",
+        "ONEDRIVE_TOKEN_PATH",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "GOOGLE_OAUTH_PROJECT_ID",
+        "GOOGLE_OAUTH_CLIENT_PATH",
+        "GOOGLE_CASEY_OAUTH_CLIENT_ID",
+        "GOOGLE_SERVICE_ACCOUNT_GLACIER_PATH",
+        "GOOGLE_SERVICE_ACCOUNT_FIREBASE_PATH",
+        "GOOGLE_SERVICE_ACCOUNT_CASEY_PATH",
+        "DROPBOX_ACCESS_TOKEN",
+        "ONEDRIVE_ACCESS_TOKEN",
+        "ONEDRIVE_DRIVE_ID",
+    }
+)
 
 TOKEN_PATTERNS = [
     (re.compile(r"^(sk-proj-[a-zA-Z0-9_-]{20,})$"), "OPENAI_API_KEY"),
@@ -207,7 +264,9 @@ def parse_environment4_vault(path: Path) -> dict[str, tuple[str, str]]:
             continue
         if not line.startswith("- "):
             # KEY=value inline (Neo4j etc.)
-            if "=" in line and any(k in line.upper() for k in ("NEO4J_", "SUPABASE", "QDRANT")):
+            if "=" in line and any(
+                k in line.upper() for k in ("NEO4J_", "SUPABASE", "QDRANT")
+            ):
                 for part in re.findall(r"([A-Z][A-Z0-9_]*)=([^\s,]+)", line):
                     k, v = part[0], part[1].strip('"')
                     if _accept_key(k):
@@ -272,7 +331,10 @@ def parse_keep_registry(path: Path) -> dict[str, tuple[str, str]]:
         if "def get_" in line and "_keys" in line:
             section = line.split("get_")[1].split("_keys")[0]
             continue
-        for m in re.finditer(r'"(api_key|primary|secondary|token|pat\d*|github_master|admin)":\s*"([^"]{12,})"', line):
+        for m in re.finditer(
+            r'"(api_key|primary|secondary|token|pat\d*|github_master|admin)":\s*"([^"]{12,})"',
+            line,
+        ):
             label, val = m.group(1), m.group(2)
             var = None
             sec = section.lower()
@@ -302,7 +364,11 @@ def parse_keep_registry(path: Path) -> dict[str, tuple[str, str]]:
                 var = "OPENROUTER_API_KEY"
             elif sec in ("xai",) or val.startswith("xai-"):
                 var = "XAI_API_KEY"
-            elif sec in ("supabase",) and label in ("service_role", "admin", "secret_key"):
+            elif sec in ("supabase",) and label in (
+                "service_role",
+                "admin",
+                "secret_key",
+            ):
                 var = "SUPABASE_SERVICE_KEY"
             if var:
                 found[var] = (val, f"{path}:keep_registry:{sec}")
@@ -368,14 +434,18 @@ def parse_audit_valid(path: Path) -> dict[str, tuple[str, str]]:
     for row in data:
         if row.get("status") != "VALID":
             continue
-        svc = service_map.get(row.get("service", ""), row.get("service", "").upper() + "_API_KEY")
+        svc = service_map.get(
+            row.get("service", ""), row.get("service", "").upper() + "_API_KEY"
+        )
         key = row.get("key", "")
         if key:
             found[svc] = (key, row.get("source", "audit_valid"))
     return found
 
 
-def enrich_from_credential_files(keys: dict[str, tuple[str, str]]) -> dict[str, tuple[str, str]]:
+def enrich_from_credential_files(
+    keys: dict[str, tuple[str, str]],
+) -> dict[str, tuple[str, str]]:
     """Derive scalar tokens from JSON credential paths when present."""
     out = dict(keys)
     dropbox_path = out.get("DROPBOX_TOKEN_PATH", ("", ""))[0]
@@ -395,7 +465,10 @@ def enrich_from_credential_files(keys: dict[str, tuple[str, str]]) -> dict[str, 
             if tok:
                 out["ONEDRIVE_ACCESS_TOKEN"] = (tok, f"{onedrive_path}:access_token")
             if data.get("drive_id"):
-                out["ONEDRIVE_DRIVE_ID"] = (data["drive_id"], f"{onedrive_path}:drive_id")
+                out["ONEDRIVE_DRIVE_ID"] = (
+                    data["drive_id"],
+                    f"{onedrive_path}:drive_id",
+                )
         except (json.JSONDecodeError, OSError):
             pass
     return out
@@ -431,7 +504,11 @@ def merge_all() -> tuple[dict[str, tuple[str, str]], dict]:
         layers.append(("environment4", parse_environment4_vault(mirrored)))
 
     # Antigravity/Gemini CLI environment (MASTER.env + latest conversation DB)
-    for path, name in [(SHARED_KEYS, "shared_keys"), (MASTER_ENV, "master_env"), (AG_CLI_EXTRACTED, "ag_cli")]:
+    for path, name in [
+        (SHARED_KEYS, "shared_keys"),
+        (MASTER_ENV, "master_env"),
+        (AG_CLI_EXTRACTED, "ag_cli"),
+    ]:
         layer = parse_env_file(path)
         if layer:
             layers.append((name, layer))
@@ -473,31 +550,49 @@ def write_env(keys: dict[str, tuple[str, str]]) -> None:
     OUT_ENV.chmod(0o600)
 
 
-def write_manifest(keys: dict[str, tuple[str, str]], provenance: dict[str, str]) -> None:
+def write_manifest(
+    keys: dict[str, tuple[str, str]], provenance: dict[str, str]
+) -> None:
     services = []
     for k in sorted(keys):
         src = provenance.get(k, "")
         rotated = "keep" in src or "audit" in src
-        services.append({
-            "env_var": k,
-            "source": src.split(":")[0][-40:] if src else "unknown",
-            "historical_source": rotated,
-            "loaded": True,
-        })
-    MANIFEST.write_text(json.dumps({
-        "at": _now(),
-        "total_keys": len(keys),
-        "vault_path": str(OUT_ENV),
-        "sources_scanned": [str(p) for p in SOURCES + KEEP_PATHS + [AUDIT_JSON]],
-        "environment4_path": str(resolve_env4_path() or ""),
-        "ag_cli_index": str(HOME / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/AG_CLI_ENVIRONMENT_INDEX.md"),
-        "ag_cli_extracted": str(AG_CLI_EXTRACTED) if AG_CLI_EXTRACTED.is_file() else "",
-        "keep_registry": str(KEEP_REGISTRY) if KEEP_REGISTRY.is_file() else "",
-        "intake_batches": [str(p) for p in sorted(VAULT_DIR.glob("intake_*.env"))],
-        "credentials_dir": str(VAULT_DIR / "credentials"),
-        "note": "Priority: intake_batch > keep_registry > ag_cli/MASTER > environment4 > gemini_keys",
-        "services": services,
-    }, indent=2))
+        services.append(
+            {
+                "env_var": k,
+                "source": src.split(":")[0][-40:] if src else "unknown",
+                "historical_source": rotated,
+                "loaded": True,
+            }
+        )
+    MANIFEST.write_text(
+        json.dumps(
+            {
+                "at": _now(),
+                "total_keys": len(keys),
+                "vault_path": str(OUT_ENV),
+                "sources_scanned": [
+                    str(p) for p in SOURCES + KEEP_PATHS + [AUDIT_JSON]
+                ],
+                "environment4_path": str(resolve_env4_path() or ""),
+                "ag_cli_index": str(
+                    HOME
+                    / "MISSIONS/SUPPORTING_DATA/SECRETS_AUDIT/ag_cli_environment/AG_CLI_ENVIRONMENT_INDEX.md"
+                ),
+                "ag_cli_extracted": str(AG_CLI_EXTRACTED)
+                if AG_CLI_EXTRACTED.is_file()
+                else "",
+                "keep_registry": str(KEEP_REGISTRY) if KEEP_REGISTRY.is_file() else "",
+                "intake_batches": [
+                    str(p) for p in sorted(VAULT_DIR.glob("intake_*.env"))
+                ],
+                "credentials_dir": str(VAULT_DIR / "credentials"),
+                "note": "Priority: intake_batch > keep_registry > ag_cli/MASTER > environment4 > gemini_keys",
+                "services": services,
+            },
+            indent=2,
+        )
+    )
 
 
 def main() -> int:
@@ -506,7 +601,11 @@ def main() -> int:
     write_manifest(keys, prov)
     print(f"Consolidated {len(keys)} keys → {OUT_ENV}")
     print(f"Manifest → {MANIFEST}")
-    print("Services loaded:", ", ".join(sorted(keys.keys())[:20]), ("..." if len(keys) > 20 else ""))
+    print(
+        "Services loaded:",
+        ", ".join(sorted(keys.keys())[:20]),
+        ("..." if len(keys) > 20 else ""),
+    )
     return 0
 
 

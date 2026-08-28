@@ -70,6 +70,7 @@ class BrowserBackend(ABC):
 
 # ─── Tasklet Backend ─────────────────────────────────────────────────────────
 
+
 class TaskletBackend(BrowserBackend):
     """Tasklet platform browser — uses invoke_tool API."""
 
@@ -92,6 +93,7 @@ class TaskletBackend(BrowserBackend):
         for char in text:
             self._invoke([{"type": {"text": char}}])
             import time
+
             time.sleep(delay / 1000)
 
     def press_key(self, key: str) -> None:
@@ -104,7 +106,15 @@ class TaskletBackend(BrowserBackend):
         self._invoke([{"screenshot": {"path": path}}])
 
     def get_text(self, max_chars: int = 30000) -> str:
-        result = self._invoke([{"evaluate": {"script": f"document.body.innerText.substring(0, {max_chars})"}}])
+        result = self._invoke(
+            [
+                {
+                    "evaluate": {
+                        "script": f"document.body.innerText.substring(0, {max_chars})"
+                    }
+                }
+            ]
+        )
         return result.get("result", "")
 
     def eval_js(self, script: str) -> Any:
@@ -116,7 +126,9 @@ class TaskletBackend(BrowserBackend):
         return result.get("result", "")
 
     def get_cookies(self) -> list:
-        result = self._invoke([{"evaluate": {"script": "JSON.stringify(document.cookie)"}}])
+        result = self._invoke(
+            [{"evaluate": {"script": "JSON.stringify(document.cookie)"}}]
+        )
         return json.loads(result.get("result", "[]"))
 
     def close(self) -> None:
@@ -215,29 +227,33 @@ class PuppeteerBackend(BrowserBackend):
             self._load_cookies()
 
     def _init_node_script(self):
-        self._script_path = Path(tempfile.mktemp(suffix='.js'))
+        self._script_path = Path(tempfile.mktemp(suffix=".js"))
         self._script_path.write_text(_PUPPETEER_SCRIPT)
 
     def _launch(self):
         self._proc = subprocess.Popen(
-            ['node', str(self._script_path)],
+            ["node", str(self._script_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env={**os.environ, 'NODE_PATH': '/data/data/com.termux/files/usr/lib/node_modules'}
+            env={
+                **os.environ,
+                "NODE_PATH": "/data/data/com.termux/files/usr/lib/node_modules",
+            },
         )
         import time
+
         time.sleep(3)
 
     def _send(self, cmd: dict) -> Any:
-        self._proc.stdin.write(json.dumps(cmd) + '\n')
+        self._proc.stdin.write(json.dumps(cmd) + "\n")
         self._proc.stdin.flush()
         line = self._proc.stdout.readline()
         resp = json.loads(line)
-        if not resp.get('ok'):
-            raise RuntimeError(resp.get('error', 'unknown error'))
-        return resp.get('result')
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "unknown error"))
+        return resp.get("result")
 
     def save_cookies(self, path: Optional[str] = None) -> None:
         """Persist browser cookies to disk."""
@@ -253,55 +269,55 @@ class PuppeteerBackend(BrowserBackend):
             try:
                 cookies = json.loads(self._cookie_file.read_text())
                 if cookies:
-                    self._send({'action': 'setCookies', 'cookies': cookies})
+                    self._send({"action": "setCookies", "cookies": cookies})
             except Exception:
                 pass
-        self._proc.stdin.write(json.dumps(cmd) + '\n')
+        self._proc.stdin.write(json.dumps(cmd) + "\n")
         self._proc.stdin.flush()
         line = self._proc.stdout.readline()
         resp = json.loads(line)
-        if not resp.get('ok'):
-            raise RuntimeError(resp.get('error', 'unknown error'))
-        return resp.get('result')
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "unknown error"))
+        return resp.get("result")
 
     def navigate(self, url: str) -> None:
-        self._send({'action': 'navigate', 'url': url})
+        self._send({"action": "navigate", "url": url})
 
     def click(self, selector_or_label: str) -> None:
-        self._send({'action': 'click', 'selector': selector_or_label})
+        self._send({"action": "click", "selector": selector_or_label})
 
     def fill(self, selector_or_label: str, value: str) -> None:
-        self._send({'action': 'fill', 'selector': selector_or_label, 'value': value})
+        self._send({"action": "fill", "selector": selector_or_label, "value": value})
 
     def type_text(self, text: str, delay: int = 50) -> None:
-        self._send({'action': 'type', 'text': text, 'delay': delay})
+        self._send({"action": "type", "text": text, "delay": delay})
 
     def press_key(self, key: str) -> None:
-        self._send({'action': 'press', 'key': key})
+        self._send({"action": "press", "key": key})
 
     def wait(self, ms: int = 2000) -> None:
-        self._send({'action': 'wait', 'ms': ms})
+        self._send({"action": "wait", "ms": ms})
 
     def screenshot(self, path: str) -> None:
-        self._send({'action': 'screenshot', 'path': path})
+        self._send({"action": "screenshot", "path": path})
 
     def get_text(self, max_chars: int = 30000) -> str:
-        return self._send({'action': 'getText', 'maxChars': max_chars})
+        return self._send({"action": "getText", "maxChars": max_chars})
 
     def eval_js(self, script: str) -> Any:
-        return self._send({'action': 'evalJs', 'script': script})
+        return self._send({"action": "evalJs", "script": script})
 
     def get_url(self) -> str:
-        return self._send({'action': 'getUrl'})
+        return self._send({"action": "getUrl"})
 
     def get_cookies(self) -> list:
-        return self._send({'action': 'getCookies'})
+        return self._send({"action": "getCookies"})
 
     def close(self) -> None:
         try:
             if self._cookie_file:
                 self.save_cookies()
-            self._send({'action': 'close'})
+            self._send({"action": "close"})
         except Exception:
             pass
         if self._proc:
@@ -314,26 +330,30 @@ class PuppeteerBackend(BrowserBackend):
 
 # ─── Auto-detect & Factory ──────────────────────────────────────────────────
 
+
 def get_backend(backend: Optional[str] = None) -> BrowserBackend:
     """
     Get a browser backend.
     backend: 'tasklet', 'puppeteer', 'playwright', or None (auto-detect).
     """
-    if backend == 'tasklet':
+    if backend == "tasklet":
         return TaskletBackend()
-    if backend == 'puppeteer':
+    if backend == "puppeteer":
         return PuppeteerBackend()
 
     # Auto-detect
-    if os.environ.get('TASKLET_ENV'):
+    if os.environ.get("TASKLET_ENV"):
         return TaskletBackend()
 
     # Check if puppeteer-core is available
     try:
         result = subprocess.run(
-            ['node', '-e', 'require("puppeteer-core")'],
+            ["node", "-e", 'require("puppeteer-core")'],
             capture_output=True,
-            env={**os.environ, 'NODE_PATH': '/data/data/com.termux/files/usr/lib/node_modules'}
+            env={
+                **os.environ,
+                "NODE_PATH": "/data/data/com.termux/files/usr/lib/node_modules",
+            },
         )
         if result.returncode == 0:
             return PuppeteerBackend()

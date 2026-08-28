@@ -83,7 +83,9 @@ def resolve_api_key(account: AccountName) -> str:
     for alias in KEY_ALIASES[account]:
         if val := os.environ.get(alias):
             return val
-    raise RuntimeError(f"Mem0 API key missing for account '{account}'. Set one of: {KEY_ALIASES[account]}")
+    raise RuntimeError(
+        f"Mem0 API key missing for account '{account}'. Set one of: {KEY_ALIASES[account]}"
+    )
 
 
 def _cache_get(key: str) -> Any | None:
@@ -178,9 +180,13 @@ class Mem0Master:
     ) -> Any:
         url = f"{BASE_URL}{path}"
         with httpx.Client(timeout=self.timeout) as client:
-            r = client.request(method, url, headers=self._headers(), json=json_body, params=params)
+            r = client.request(
+                method, url, headers=self._headers(), json=json_body, params=params
+            )
             if r.status_code >= 400:
-                raise RuntimeError(f"Mem0 {method} {path} → {r.status_code}: {r.text[:400]}")
+                raise RuntimeError(
+                    f"Mem0 {method} {path} → {r.status_code}: {r.text[:400]}"
+                )
             if not r.content:
                 return {}
             return r.json()
@@ -204,7 +210,11 @@ class Mem0Master:
         version: str = "v2",
         use_v3: bool = True,
     ) -> dict[str, Any]:
-        messages = content if isinstance(content, list) else [{"role": "user", "content": str(content)}]
+        messages = (
+            content
+            if isinstance(content, list)
+            else [{"role": "user", "content": str(content)}]
+        )
         body: dict[str, Any] = {
             "messages": messages,
             "infer": infer,
@@ -242,7 +252,9 @@ class Mem0Master:
         api_version: Literal["v3", "v2", "v1"] = "v3",
         use_cache: bool = True,
     ) -> list[dict[str, Any]]:
-        cache_key = hashlib.sha256(f"{self.account}:{query}:{top_k}".encode()).hexdigest()
+        cache_key = hashlib.sha256(
+            f"{self.account}:{query}:{top_k}".encode()
+        ).hexdigest()
         if use_cache and (cached := _cache_get(cache_key)):
             return cached
 
@@ -264,7 +276,11 @@ class Mem0Master:
             body = {"query": query, "filters": filters}
             data = self._request("POST", "/v1/memories/search/", json_body=body)
 
-        results = data if isinstance(data, list) else data.get("results", data.get("memories", []))
+        results = (
+            data
+            if isinstance(data, list)
+            else data.get("results", data.get("memories", []))
+        )
         results = results or []
         if use_cache:
             _cache_set(cache_key, results)
@@ -275,7 +291,13 @@ class Mem0Master:
     def get(self, memory_id: str) -> dict[str, Any]:
         return self._request("GET", f"/v1/memories/{memory_id}/")
 
-    def get_all(self, *, limit: int = 100, page: int = 1, api_version: Literal["v2", "v1"] = "v2") -> Any:
+    def get_all(
+        self,
+        *,
+        limit: int = 100,
+        page: int = 1,
+        api_version: Literal["v2", "v1"] = "v2",
+    ) -> Any:
         """List memories — v2 uses POST with filters; v1 supports GET."""
         if api_version == "v2":
             body = {**self.scope.filters(), "limit": limit, "page": page}
@@ -297,13 +319,17 @@ class Mem0Master:
 
     def batch_update(self, memories: list[dict[str, str]]) -> dict[str, Any]:
         """Each item: {"memory_id": "...", "text": "..."}"""
-        return self._request("PUT", "/v1/memories/batch/", json_body={"memories": memories})
+        return self._request(
+            "PUT", "/v1/memories/batch/", json_body={"memories": memories}
+        )
 
     def delete(self, memory_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"/v1/memories/{memory_id}/")
 
     def batch_delete(self, memory_ids: list[str]) -> dict[str, Any]:
-        return self._request("DELETE", "/v1/memories/batch/", json_body={"memory_ids": memory_ids})
+        return self._request(
+            "DELETE", "/v1/memories/batch/", json_body={"memory_ids": memory_ids}
+        )
 
     def delete_all(self) -> dict[str, Any]:
         return self._request("DELETE", "/v1/memories/", json_body=self.scope.filters())
@@ -320,7 +346,9 @@ class Mem0Master:
     def get_export(self, export_id: str) -> dict[str, Any]:
         return self._request("POST", f"/v1/memories/export/{export_id}/")
 
-    def feedback(self, memory_id: str, feedback: str, *, reason: str | None = None) -> dict[str, Any]:
+    def feedback(
+        self, memory_id: str, feedback: str, *, reason: str | None = None
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {"memory_id": memory_id, "feedback": feedback}
         if reason:
             body["reason"] = reason
@@ -346,22 +374,32 @@ class Mem0Master:
 class AsyncMem0Master:
     """Async Mem0 platform client — parallel batch + non-blocking ingest."""
 
-    def __init__(self, account: AccountName = "pro", scope: Mem0Scope | None = None) -> None:
+    def __init__(
+        self, account: AccountName = "pro", scope: Mem0Scope | None = None
+    ) -> None:
         self._sync = Mem0Master(account=account, scope=scope or Mem0Scope())
         self.account = account
 
     def _headers(self) -> dict[str, str]:
         return self._sync._headers()
 
-    async def _request(self, method: str, path: str, *, json_body: dict | None = None) -> Any:
+    async def _request(
+        self, method: str, path: str, *, json_body: dict | None = None
+    ) -> Any:
         url = f"{BASE_URL}{path}"
         async with httpx.AsyncClient(timeout=self._sync.timeout) as client:
-            r = await client.request(method, url, headers=self._headers(), json=json_body)
+            r = await client.request(
+                method, url, headers=self._headers(), json=json_body
+            )
             if r.status_code >= 400:
-                raise RuntimeError(f"Mem0 async {method} {path} → {r.status_code}: {r.text[:400]}")
+                raise RuntimeError(
+                    f"Mem0 async {method} {path} → {r.status_code}: {r.text[:400]}"
+                )
             return r.json() if r.content else {}
 
-    async def add(self, content: str | list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
+    async def add(
+        self, content: str | list[dict[str, str]], **kwargs: Any
+    ) -> dict[str, Any]:
         return await asyncio.to_thread(self._sync.add, content, **kwargs)
 
     async def search(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
@@ -397,7 +435,10 @@ def try_sdk_demo() -> dict[str, Any]:
     try:
         from mem0 import AsyncMemoryClient, MemoryClient  # type: ignore
     except ImportError:
-        return {"sdk": False, "reason": "pip install mem0ai not present — REST client active"}
+        return {
+            "sdk": False,
+            "reason": "pip install mem0ai not present — REST client active",
+        }
 
     key = resolve_api_key("pro")
     client = MemoryClient(api_key=key)
@@ -412,16 +453,30 @@ def try_sdk_demo() -> dict[str, Any]:
 
 def cli() -> int:
     ap = argparse.ArgumentParser(description="APEX Mem0 Master CLI")
-    ap.add_argument("command", choices=[
-        "health", "add", "search", "get", "get-all", "history", "update", "delete",
-        "batch-delete", "export", "dual-search", "sdk-check", "demo",
-    ])
+    ap.add_argument(
+        "command",
+        choices=[
+            "health",
+            "add",
+            "search",
+            "get",
+            "get-all",
+            "history",
+            "update",
+            "delete",
+            "batch-delete",
+            "export",
+            "dual-search",
+            "sdk-check",
+            "demo",
+        ],
+    )
     ap.add_argument("args", nargs="*", help="content, query, or memory_id")
     ap.add_argument("--account", choices=["pro", "reg"], default="pro")
     ap.add_argument("--user-id", default="")
     ap.add_argument("--agent-id", default="apex-grok")
     ap.add_argument("--top-k", type=int, default=6)
-    ap.add_argument("--metadata", default="", help='JSON metadata for add')
+    ap.add_argument("--metadata", default="", help="JSON metadata for add")
     ap.add_argument("--immutable", action="store_true")
     ap.add_argument("--no-infer", action="store_true")
     ns = ap.parse_args()
@@ -433,11 +488,21 @@ def cli() -> int:
     m = Mem0Master(account=ns.account, scope=scope)
 
     if ns.command == "health":
-        print(json.dumps({"pro": Mem0Master("pro").health(), "reg": Mem0Master("reg").health()}, indent=2))
+        print(
+            json.dumps(
+                {"pro": Mem0Master("pro").health(), "reg": Mem0Master("reg").health()},
+                indent=2,
+            )
+        )
         return 0
 
     if ns.command == "dual-search":
-        print(json.dumps(dual_search(" ".join(ns.args) or "apex operator", top_k=ns.top_k), indent=2))
+        print(
+            json.dumps(
+                dual_search(" ".join(ns.args) or "apex operator", top_k=ns.top_k),
+                indent=2,
+            )
+        )
         return 0
 
     if ns.command == "sdk-check":

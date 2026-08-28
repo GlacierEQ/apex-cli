@@ -24,14 +24,20 @@ def parse_cloud_pl(name: str) -> dict:
     )
     if not m:
         return {}
-    return {"captured_date": m.group(1), "cloud_pl_date": m.group(2), "cloud_pl_time": m.group(3)}
+    return {
+        "captured_date": m.group(1),
+        "cloud_pl_date": m.group(2),
+        "cloud_pl_time": m.group(3),
+    }
 
 
 def main() -> int:
     print(f"Listing {REMOTE} (metadata only) …")
     proc = subprocess.run(
         ["rclone", "lsjson", REMOTE, "--recursive", "--files-only"],
-        capture_output=True, text=True, timeout=900,
+        capture_output=True,
+        text=True,
+        timeout=900,
     )
     if proc.returncode != 0:
         print(proc.stderr, file=sys.stderr)
@@ -78,17 +84,25 @@ def main() -> int:
     # Queue lightweight interaction stubs for Notion flush worker
     with QUEUE.open("a", encoding="utf-8") as q:
         for r in rows[:50]:
-            q.write(json.dumps({
-                "source": "dropbox_video_index",
-                "interactions": [{
-                    "title": r["name"],
-                    "type": "Video Asset",
-                    "date": r.get("captured_date") or (r.get("mtime") or "")[:10],
-                    "summary": f"{r['size_gb']} GB — {r['path']}",
-                    "source_file": r["path"],
-                }],
-                "actors": [],
-            }) + "\n")
+            q.write(
+                json.dumps(
+                    {
+                        "source": "dropbox_video_index",
+                        "interactions": [
+                            {
+                                "title": r["name"],
+                                "type": "Video Asset",
+                                "date": r.get("captured_date")
+                                or (r.get("mtime") or "")[:10],
+                                "summary": f"{r['size_gb']} GB — {r['path']}",
+                                "source_file": r["path"],
+                            }
+                        ],
+                        "actors": [],
+                    }
+                )
+                + "\n"
+            )
 
     print(json.dumps(summary, indent=2))
     return 0

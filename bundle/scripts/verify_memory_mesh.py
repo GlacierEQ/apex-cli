@@ -29,11 +29,18 @@ async def main() -> int:
     health = await health_check()
     path = write_mesh_config(health)
 
-    layer_order = ["mem0", "supermemory", "memory_plugin", "pinecone", "qdrant", "context7"]
+    layer_order = [
+        "mem0",
+        "supermemory",
+        "memory_plugin",
+        "pinecone",
+        "qdrant",
+        "context7",
+    ]
     for name in layer_order:
-        info = health["layers"].get(name, health["layers"].get(
-            "mem0_pro" if name == "mem0" else name, {}
-        ))
+        info = health["layers"].get(
+            name, health["layers"].get("mem0_pro" if name == "mem0" else name, {})
+        )
         if name == "mem0":
             info = health["layers"].get("mem0", {})
         key_ok = info.get("key_present", False)

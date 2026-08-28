@@ -76,8 +76,11 @@ def _load_env() -> None:
                 continue
             # Gatekeeper wins for auth tokens (avoid stale shell/.env overrides).
             if path.name == "gatekeeper.env" and k in {
-                "NOTION_API_TOKEN", "NOTION_TOKEN", "NOTION_API_KEY",
-                "DROPBOX_ACCESS_TOKEN", "GITHUB_TOKEN",
+                "NOTION_API_TOKEN",
+                "NOTION_TOKEN",
+                "NOTION_API_KEY",
+                "DROPBOX_ACCESS_TOKEN",
+                "GITHUB_TOKEN",
             }:
                 os.environ[k] = v
             elif k not in os.environ:
@@ -98,6 +101,7 @@ def _handle_signal(signum, _frame):
 def worker_dropbox() -> dict:
     _alpha_path()
     from integrations.dropbox_watcher import scan_dropbox
+
     scan_dropbox()
     return {"worker": "dropbox", "ok": True}
 
@@ -105,6 +109,7 @@ def worker_dropbox() -> dict:
 def worker_queue() -> dict:
     _alpha_path()
     from integrations.notion_queue import flush_queue, queue_depth
+
     before = queue_depth()
     result = flush_queue()
     result["worker"] = "queue"
@@ -115,6 +120,7 @@ def worker_queue() -> dict:
 def worker_legal() -> dict:
     _alpha_path()
     from apex_nexus_coordinator import ApexNexus
+
     nexus = ApexNexus()
     nexus.execute_protocol("CATACLYSM")
     return {"worker": "legal", "ok": True}
@@ -171,7 +177,12 @@ def worker_actors() -> dict:
             enqueue({"actors": [actor], "interactions": []}, source="actors_batch")
             queued += 1
 
-    return {"worker": "actors", "pushed": pushed, "queued": queued, "api_live": api_live}
+    return {
+        "worker": "actors",
+        "pushed": pushed,
+        "queued": queued,
+        "api_live": api_live,
+    }
 
 
 def build_status(cycle: int, last: dict) -> dict:
@@ -294,7 +305,12 @@ def main() -> int:
 
     if args.worker:
         _load_env()
-        fn = {"dropbox": worker_dropbox, "queue": worker_queue, "legal": worker_legal, "actors": worker_actors}[args.worker]
+        fn = {
+            "dropbox": worker_dropbox,
+            "queue": worker_queue,
+            "legal": worker_legal,
+            "actors": worker_actors,
+        }[args.worker]
         print(json.dumps(fn(), indent=2))
         return 0
 

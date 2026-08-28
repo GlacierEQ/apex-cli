@@ -30,11 +30,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from paths import BASE_DIR, SESSION_DIR
+from paths import SESSION_DIR
 
 
 class PipelineError(Exception):
     """Raised when a pipeline phase fails — halts execution."""
+
     pass
 
 
@@ -75,14 +76,18 @@ class Phase:
             except Exception as e:
                 self.error = str(e)
                 if attempt < self.retries:
-                    wait = 2 ** attempt
-                    print(f"  [{self.name}] attempt {attempt+1} failed: {e} — retrying in {wait}s")
+                    wait = 2**attempt
+                    print(
+                        f"  [{self.name}] attempt {attempt + 1} failed: {e} — retrying in {wait}s"
+                    )
                     time.sleep(wait)
                 else:
                     self.status = "failed" if self.required else "skipped"
                     self.duration_ms = (time.time() - start) * 1000
                     if self.required:
-                        raise PipelineError(f"Phase '{self.name}' failed after {self.attempts} attempts: {e}")
+                        raise PipelineError(
+                            f"Phase '{self.name}' failed after {self.attempts} attempts: {e}"
+                        )
                     return None
 
 
@@ -125,42 +130,48 @@ class Pipeline:
         self.status = "running"
         results = []
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"PIPELINE: {self.name}")
         print(f"Started: {self.started_at.isoformat()}")
         print(f"Phases: {len(self.phases)}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         for i, phase in enumerate(self.phases, 1):
             print(f"[{i}/{len(self.phases)}] {phase.name}...", end=" ", flush=True)
             try:
                 phase.execute(self.context)
                 print(f"✅ ({phase.duration_ms:.0f}ms)")
-                results.append({
-                    "phase": phase.name,
-                    "status": "passed",
-                    "attempts": phase.attempts,
-                    "duration_ms": round(phase.duration_ms),
-                })
+                results.append(
+                    {
+                        "phase": phase.name,
+                        "status": "passed",
+                        "attempts": phase.attempts,
+                        "duration_ms": round(phase.duration_ms),
+                    }
+                )
             except PipelineError as e:
                 print(f"❌ FAILED: {e}")
-                results.append({
-                    "phase": phase.name,
-                    "status": "failed",
-                    "error": str(e),
-                    "attempts": phase.attempts,
-                    "duration_ms": round(phase.duration_ms),
-                })
+                results.append(
+                    {
+                        "phase": phase.name,
+                        "status": "failed",
+                        "error": str(e),
+                        "attempts": phase.attempts,
+                        "duration_ms": round(phase.duration_ms),
+                    }
+                )
                 self.status = "failed"
                 break
             except Exception as e:
                 print(f"❌ ERROR: {e}")
-                results.append({
-                    "phase": phase.name,
-                    "status": "error",
-                    "error": str(e),
-                    "traceback": traceback.format_exc(),
-                })
+                results.append(
+                    {
+                        "phase": phase.name,
+                        "status": "error",
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                    }
+                )
                 self.status = "failed"
                 break
         else:
@@ -184,16 +195,17 @@ class Pipeline:
         log_path = self.log_dir / f"{self.name}_{ts}.json"
         log_path.write_text(json.dumps(report, indent=2))
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"RESULT: {self.status.upper()}")
         print(f"Duration: {total_ms:.0f}ms")
         print(f"Log: {log_path}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         return report
 
 
 # ─── Common Phase Functions ──────────────────────────────────────────────────
+
 
 def boot_phase(context: dict) -> dict:
     """Phase 1: Verify deps, dirs, connectivity."""
@@ -209,21 +221,32 @@ def boot_phase(context: dict) -> dict:
     result = subprocess.run(
         ["node", "-e", "require('puppeteer-core')"],
         capture_output=True,
-        env={**__import__("os").environ, "NODE_PATH": "/data/data/com.termux/files/usr/lib/node_modules"}
+        env={
+            **__import__("os").environ,
+            "NODE_PATH": "/data/data/com.termux/files/usr/lib/node_modules",
+        },
     )
     if result.returncode != 0:
-        raise RuntimeError("puppeteer-core not installed — run: npm install -g puppeteer-core")
+        raise RuntimeError(
+            "puppeteer-core not installed — run: npm install -g puppeteer-core"
+        )
     context["puppeteer"] = True
 
     # Check Chromium
     import shutil
-    chrome = shutil.which("chromium-browser") or shutil.which("chromium") or shutil.which("google-chrome")
+
+    chrome = (
+        shutil.which("chromium-browser")
+        or shutil.which("chromium")
+        or shutil.which("google-chrome")
+    )
     if not chrome:
         raise RuntimeError("Chromium not found")
     context["chrome_path"] = chrome
 
     # Verify dirs
     from paths import ALL_DIRS
+
     for d in ALL_DIRS:
         d.mkdir(parents=True, exist_ok=True)
     context["dirs_created"] = len(ALL_DIRS)
@@ -233,7 +256,7 @@ def boot_phase(context: dict) -> dict:
 
 def credentials_phase(context: dict) -> dict:
     """Phase 2: Validate credentials exist for requested services."""
-    from paths import load_credentials, CONNECTIONS_FILE
+    from paths import load_credentials
 
     services_needed = context.get("services_needed", [])
     missing = []
@@ -266,7 +289,7 @@ def browser_test_phase(context: dict) -> dict:
     b.close()
 
     if "origin" not in text.lower() and "headers" not in text.lower():
-        raise RuntimeError(f"Browser test failed — unexpected page content")
+        raise RuntimeError("Browser test failed — unexpected page content")
 
     return {"url": url, "backend": type(b).__name__}
 
@@ -274,7 +297,6 @@ def browser_test_phase(context: dict) -> dict:
 def skill_load_phase(context: dict) -> dict:
     """Phase 4: Import and validate skill modules."""
     import importlib
-    import sys
 
     skills_dir = Path(__file__).parent / "skills"
     skills_needed = context.get("skills_needed", [])
@@ -309,6 +331,7 @@ def skill_load_phase(context: dict) -> dict:
 
 # ─── Quick Pipeline Builders ─────────────────────────────────────────────────
 
+
 def make_boot_pipeline(extra_phases: Optional[List[tuple]] = None) -> Pipeline:
     """Standard boot pipeline: boot → credentials → browser test."""
     p = Pipeline("boot")
@@ -321,7 +344,9 @@ def make_boot_pipeline(extra_phases: Optional[List[tuple]] = None) -> Pipeline:
     return p
 
 
-def make_skill_pipeline(skill_name: str, services: Optional[List[str]] = None) -> Pipeline:
+def make_skill_pipeline(
+    skill_name: str, services: Optional[List[str]] = None
+) -> Pipeline:
     """Skill execution pipeline: boot → creds → load skill → execute."""
     p = Pipeline(f"skill:{skill_name}")
     p.set("skills_needed", [skill_name])

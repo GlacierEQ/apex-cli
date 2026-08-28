@@ -18,6 +18,7 @@ log = logging.getLogger("connections")
 
 CONFIG_PATH = Path(os.path.expanduser("~/.apex/connections.json"))
 
+
 class ConnectionManager:
     """
     Manages SaaS connection IDs and credentials.
@@ -49,7 +50,9 @@ class ConnectionManager:
             try:
                 with open(CONFIG_PATH) as f:
                     self._connections = json.load(f)
-                log.info(f"✅ Loaded {len(self._connections)} connections from {CONFIG_PATH}")
+                log.info(
+                    f"✅ Loaded {len(self._connections)} connections from {CONFIG_PATH}"
+                )
             except Exception as e:
                 log.error(f"❌ Failed to load connections: {e}")
         else:
@@ -96,11 +99,13 @@ class ConnectionManager:
 # Singleton
 _manager: Optional[ConnectionManager] = None
 
+
 def get_manager() -> ConnectionManager:
     global _manager
     if _manager is None:
         _manager = ConnectionManager()
     return _manager
+
 
 def get_connection(service: str) -> Optional[str]:
     """Convenience: get a connection ID."""

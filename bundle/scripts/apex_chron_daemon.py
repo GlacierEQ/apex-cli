@@ -22,7 +22,6 @@ import subprocess
 import signal
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
 
 HOME = Path.home()
 CHRON_LOG = HOME / ".apex/chron_daemon.log"
@@ -31,13 +30,11 @@ PID_FILE = HOME / ".apex/chron_daemon.pid"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - [APEX-CHRON] %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(CHRON_LOG),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.FileHandler(CHRON_LOG), logging.StreamHandler(sys.stdout)],
 )
 
 running = True
+
 
 def handle_exit(signum, frame):
     global running
@@ -46,8 +43,10 @@ def handle_exit(signum, frame):
     if PID_FILE.exists():
         PID_FILE.unlink()
 
+
 signal.signal(signal.SIGINT, handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
+
 
 def run_job(cmd: list[str] | str, cwd: Path | str = HOME) -> bool:
     try:
@@ -58,21 +57,24 @@ def run_job(cmd: list[str] | str, cwd: Path | str = HOME) -> bool:
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            timeout=1800 # 30 min max
+            timeout=1800,  # 30 min max
         )
         if res.returncode == 0:
             logging.info(f"Job completed successfully: {cmd}")
             return True
         else:
-            logging.error(f"Job failed (code={res.returncode}): {res.stdout} {res.stderr}")
+            logging.error(
+                f"Job failed (code={res.returncode}): {res.stdout} {res.stderr}"
+            )
             return False
     except Exception as e:
         logging.error(f"Exception executing job: {e}")
         return False
 
+
 def daemon_loop():
     logging.info("Starting APEX Chron Automation Loop...")
-    
+
     # Track the last execution times (timestamps)
     last_hourly = 0
     last_6hourly = 0
@@ -81,7 +83,7 @@ def daemon_loop():
 
     while running:
         now = time.time()
-        
+
         # 1. Hourly check (3600 sec): Memory Sync Bridge
         if now - last_hourly >= 3600:
             logging.info("Running Hourly Memory Sync Bridge...")
@@ -91,24 +93,41 @@ def daemon_loop():
         # 2. 6-Hour check (21600 sec): CATACLYSM Scan
         if now - last_6hourly >= 21600:
             logging.info("Running 6-Hourly CATACLYSM Legal Scan...")
-            alpha_dir = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-alpha"
-            run_job(["python3", "apex_nexus_coordinator.py", "execute", "--protocol", "CATACLYSM"], cwd=alpha_dir)
+            alpha_dir = (
+                HOME
+                / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-alpha"
+            )
+            run_job(
+                [
+                    "python3",
+                    "apex_nexus_coordinator.py",
+                    "execute",
+                    "--protocol",
+                    "CATACLYSM",
+                ],
+                cwd=alpha_dir,
+            )
             last_6hourly = now
 
         # 3. 12-Hour check (43200 sec): Surface Refresh
         if now - last_12hourly >= 43200:
             logging.info("Running 12-Hourly Surface Refresher...")
-            run_job(f"python3 {HOME}/scripts/apex_distill_surface.py && python3 {HOME}/scripts/apex_distill_notion.py")
+            run_job(
+                f"python3 {HOME}/scripts/apex_distill_surface.py && python3 {HOME}/scripts/apex_distill_notion.py"
+            )
             last_12hourly = now
 
         # 4. Daily check (86400 sec): Audit Log Rotation & Hash Seals
         if now - last_daily >= 86400:
             logging.info("Running Daily Audit log Maintenance...")
-            run_job(f"python3 {HOME}/scripts/apex_helix_maximize.py && python3 {HOME}/scripts/apex_agentic_maximize.py")
+            run_job(
+                f"python3 {HOME}/scripts/apex_helix_maximize.py && python3 {HOME}/scripts/apex_agentic_maximize.py"
+            )
             last_daily = now
 
         # Sleep for 10 seconds between clock polls to keep CPU overhead zero
         time.sleep(10)
+
 
 def main():
     if PID_FILE.exists():
@@ -123,12 +142,13 @@ def main():
 
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
     PID_FILE.write_text(str(os.getpid()))
-    
+
     try:
         daemon_loop()
     finally:
         if PID_FILE.exists():
             PID_FILE.unlink()
+
 
 if __name__ == "__main__":
     main()

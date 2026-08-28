@@ -28,7 +28,9 @@ MAX_BYTES = 1024  # only delete near-empty conflict dirs
 def folder_size(remote: str) -> dict:
     proc = subprocess.run(
         ["rclone", "size", remote, "--json"],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     if proc.returncode != 0:
         return {"error": proc.stderr.strip()}
@@ -57,13 +59,15 @@ def main() -> int:
             action = "purged" if ok else "purge_failed"
             if ok and not DRY:
                 removed += 1
-        results.append({
-            "remote": remote,
-            "count": count,
-            "bytes": bytes_,
-            "action": action,
-            "ok": ok,
-        })
+        results.append(
+            {
+                "remote": remote,
+                "count": count,
+                "bytes": bytes_,
+                "action": action,
+                "ok": ok,
+            }
+        )
         print(f"{action:12} {count:3} files {bytes_:5} B  {remote}")
 
     report = {

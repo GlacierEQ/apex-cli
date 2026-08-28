@@ -33,14 +33,19 @@ def verify_cloudflare() -> dict:
     if not token:
         return check("cloudflare", False, "no_token")
     req = urllib.request.Request(
-        f"https://api.cloudflare.com/client/v4/accounts/{acct}/tokens/verify" if acct
+        f"https://api.cloudflare.com/client/v4/accounts/{acct}/tokens/verify"
+        if acct
         else "https://api.cloudflare.com/client/v4/user/tokens/verify",
         headers={"Authorization": f"Bearer {token}"},
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
-        return check("cloudflare", data.get("success", False), data.get("messages", [{}])[0].get("message", "ok"))
+        return check(
+            "cloudflare",
+            data.get("success", False),
+            data.get("messages", [{}])[0].get("message", "ok"),
+        )
     except urllib.error.HTTPError as e:
         return check("cloudflare", False, f"http_{e.code}")
     except Exception as e:
@@ -49,7 +54,9 @@ def verify_cloudflare() -> dict:
 
 def verify_supabase() -> dict:
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-    key = os.environ.get("SUPABASE_SERVICE_KEY", "") or os.environ.get("SUPABASE_ANON_KEY", "")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "") or os.environ.get(
+        "SUPABASE_ANON_KEY", ""
+    )
     if not url or not key:
         return check("supabase", False, "missing_url_or_key")
     req = urllib.request.Request(
@@ -58,7 +65,9 @@ def verify_supabase() -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            return check("supabase", resp.status in (200, 401, 404), f"http_{resp.status}")
+            return check(
+                "supabase", resp.status in (200, 401, 404), f"http_{resp.status}"
+            )
     except urllib.error.HTTPError as e:
         return check("supabase", e.code in (200, 401), f"http_{e.code}")
     except Exception as e:
@@ -110,18 +119,35 @@ def main() -> int:
         verify_supabase(),
         verify_dropbox(),
         *verify_files(),
-        check("shade", bool(os.environ.get("SHADE_API_KEY")), "loaded" if os.environ.get("SHADE_API_KEY") else "missing"),
+        check(
+            "shade",
+            bool(os.environ.get("SHADE_API_KEY")),
+            "loaded" if os.environ.get("SHADE_API_KEY") else "missing",
+        ),
         check("taskade", bool(os.environ.get("TASKADE_API_KEY")), "loaded"),
-        check("r2", bool(os.environ.get("R2_ACCESS_KEY_ID") and os.environ.get("R2_SECRET_ACCESS_KEY")), "s3_creds_loaded"),
+        check(
+            "r2",
+            bool(
+                os.environ.get("R2_ACCESS_KEY_ID")
+                and os.environ.get("R2_SECRET_ACCESS_KEY")
+            ),
+            "s3_creds_loaded",
+        ),
         check("e2b", bool(os.environ.get("E2B_API_KEY")), "loaded"),
         check("mimo", bool(os.environ.get("MIMO_API_KEY")), "loaded"),
         check("parsehub", bool(os.environ.get("PARSEHUB_API_KEY")), "loaded"),
         check("harpa", bool(os.environ.get("HARPA_API_KEY")), "loaded"),
-        check("supermemory_codex", bool(os.environ.get("SUPERMEMORY_CODEX_API_KEY")), "loaded"),
+        check(
+            "supermemory_codex",
+            bool(os.environ.get("SUPERMEMORY_CODEX_API_KEY")),
+            "loaded",
+        ),
     ]
     out_path = HOME / ".apex/INTAKE_VERIFY.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"results": results}, indent=2) + "\n", encoding="utf-8")
+    out_path.write_text(
+        json.dumps({"results": results}, indent=2) + "\n", encoding="utf-8"
+    )
     ok_count = sum(1 for r in results if r["ok"])
     print(f"Verified {ok_count}/{len(results)} — report: {out_path}")
     for r in results:

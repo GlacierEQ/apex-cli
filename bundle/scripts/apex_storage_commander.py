@@ -13,7 +13,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +21,9 @@ ALPHA = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-al
 OMEGA = HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-omega"
 FS_CC = HOME / "APEX_COMMAND_CENTER/FS_COMMANDER"
 STATUS_PATH = HOME / ".apex/helix_fs_status.json"
-MANIFEST_PATH = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/FORENSICS/storage_manifest.json"
+MANIFEST_PATH = (
+    HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/FORENSICS/storage_manifest.json"
+)
 
 # Safe purge targets (Termux-adapted; never touches MISSIONS evidence)
 PURGE_TARGETS: list[tuple[str, str]] = [
@@ -41,7 +42,9 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def run_cmd(cmd: list[str] | str, cwd: Path | None = None, timeout: int = 120) -> tuple[int, str]:
+def run_cmd(
+    cmd: list[str] | str, cwd: Path | None = None, timeout: int = 120
+) -> tuple[int, str]:
     try:
         r = subprocess.run(
             cmd,
@@ -114,7 +117,9 @@ def audit_disk() -> dict:
     for name, path in PURGE_TARGETS:
         p = Path(path)
         if p.exists():
-            reclaimable.append({"name": name, "path": path, "size": fmt_size(dir_size(p))})
+            reclaimable.append(
+                {"name": name, "path": path, "size": fmt_size(dir_size(p))}
+            )
 
     return {
         "at": _now(),
@@ -134,7 +139,9 @@ def safe_purge(dry_run: bool) -> dict:
             continue
         before = dir_size(p)
         if dry_run:
-            results["purged"].append({"name": name, "path": path, "size": fmt_size(before), "dry": True})
+            results["purged"].append(
+                {"name": name, "path": path, "size": fmt_size(before), "dry": True}
+            )
             results["freed_estimate"] += before
             continue
         try:
@@ -143,7 +150,9 @@ def safe_purge(dry_run: bool) -> dict:
             else:
                 shutil.rmtree(p)
                 p.mkdir(parents=True, exist_ok=True)
-            results["purged"].append({"name": name, "path": path, "freed": fmt_size(before)})
+            results["purged"].append(
+                {"name": name, "path": path, "freed": fmt_size(before)}
+            )
             results["freed_estimate"] += before
         except OSError as e:
             results["skipped"].append({"name": name, "reason": str(e)})
@@ -159,7 +168,12 @@ def activate_alpha(dry_run: bool) -> dict:
     validate = ALPHA / "scripts/apex_control_plane_validate.py"
     if validate.is_file() and not dry_run:
         code, text = run_cmd(["python3", str(validate)], cwd=ALPHA, timeout=60)
-        out["steps"].append({"control_plane_validate": "ok" if code == 0 else "fail", "detail": text[-500:]})
+        out["steps"].append(
+            {
+                "control_plane_validate": "ok" if code == 0 else "fail",
+                "detail": text[-500:],
+            }
+        )
 
     observe = ALPHA / "scripts/apex_observe_files.py"
     report_dir = ALPHA / ".apex/control-plane/reports"
@@ -168,21 +182,28 @@ def activate_alpha(dry_run: bool) -> dict:
     if observe.is_file() and not dry_run:
         code, text = run_cmd(
             [
-                "python3", str(observe),
+                "python3",
+                str(observe),
                 str(HOME / "MISSIONS"),
-                "--source", "local_filesystem",
-                "--case-tag", "1FDV-23-0001009",
-                "--max-files", "500",
-                "--output", str(observe_out),
+                "--source",
+                "local_filesystem",
+                "--case-tag",
+                "1FDV-23-0001009",
+                "--max-files",
+                "500",
+                "--output",
+                str(observe_out),
             ],
             cwd=ALPHA,
             timeout=180,
         )
-        out["steps"].append({
-            "observe_missions": "ok" if code == 0 else "fail",
-            "output": str(observe_out),
-            "detail": text[-300:],
-        })
+        out["steps"].append(
+            {
+                "observe_missions": "ok" if code == 0 else "fail",
+                "output": str(observe_out),
+                "detail": text[-300:],
+            }
+        )
     elif dry_run:
         out["steps"].append({"observe_missions": "dry_run"})
 
@@ -202,10 +223,12 @@ def activate_omega(dry_run: bool) -> dict:
 
     if daemon.is_file() and not dry_run:
         code, text = run_cmd(["python3", str(daemon)], cwd=OMEGA, timeout=30)
-        out["steps"].append({
-            "orchestrator_daemon": "ok" if code == 0 else "warn",
-            "detail": text[-400:],
-        })
+        out["steps"].append(
+            {
+                "orchestrator_daemon": "ok" if code == 0 else "warn",
+                "detail": text[-400:],
+            }
+        )
     elif dry_run:
         out["steps"].append({"orchestrator_daemon": "dry_run"})
 
@@ -242,10 +265,14 @@ def write_status(audit: dict, alpha: dict, omega: dict, purge: dict | None) -> N
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="APEX FS Commander — Termux storage + helix activation")
+    parser = argparse.ArgumentParser(
+        description="APEX FS Commander — Termux storage + helix activation"
+    )
     parser.add_argument("--audit", action="store_true", help="Disk audit only")
     parser.add_argument("--purge", action="store_true", help="Safe cache/log purge")
-    parser.add_argument("--activate", action="store_true", help="Activate Alpha + Omega strands")
+    parser.add_argument(
+        "--activate", action="store_true", help="Activate Alpha + Omega strands"
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--all", action="store_true", help="audit + purge + activate")
     args = parser.parse_args()

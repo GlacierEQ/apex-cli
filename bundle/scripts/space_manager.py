@@ -15,6 +15,7 @@ HOME = Path.home()
 LOG_DIR = HOME / ".local" / "share" / "tmp"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+
 def get_usage(path):
     """Get disk usage for a path."""
     try:
@@ -23,9 +24,15 @@ def get_usage(path):
         free = st.f_bavail * st.f_frsize
         used = total - free
         pct = int((used / total) * 100) if total > 0 else 0
-        return {"total_gb": round(total / 1e9, 1), "used_gb": round(used / 1e9, 1), "free_gb": round(free / 1e9, 1), "pct": pct}
+        return {
+            "total_gb": round(total / 1e9, 1),
+            "used_gb": round(used / 1e9, 1),
+            "free_gb": round(free / 1e9, 1),
+            "pct": pct,
+        }
     except:
         return {"total_gb": 0, "used_gb": 0, "free_gb": 0, "pct": 0}
+
 
 def get_dir_size(path):
     """Get directory size in bytes."""
@@ -37,6 +44,7 @@ def get_dir_size(path):
     except:
         pass
     return total
+
 
 def clean_caches():
     """Clear all safe caches."""
@@ -56,12 +64,17 @@ def clean_caches():
             if d == Path("/tmp"):
                 # Only clean old tmp files
                 for f in d.glob("*"):
-                    if f.is_file() and f.stat().st_mtime < (datetime.now() - timedelta(days=1)).timestamp():
+                    if (
+                        f.is_file()
+                        and f.stat().st_mtime
+                        < (datetime.now() - timedelta(days=1)).timestamp()
+                    ):
                         f.unlink(missing_ok=True)
             else:
                 shutil.rmtree(d, ignore_errors=True)
             cleaned.append({"path": str(d), "size_mb": round(size / 1e6, 1)})
     return cleaned
+
 
 def compress_old_files(path, days=30):
     """Compress files older than N days."""
@@ -71,23 +84,27 @@ def compress_old_files(path, days=30):
         if f.is_file() and datetime.fromtimestamp(f.stat().st_mtime) < cutoff:
             gz_path = f.with_suffix(".gz")
             if not gz_path.exists():
-                with open(f, 'rb') as fi:
-                    with gzip.open(gz_path, 'wb') as fo:
+                with open(f, "rb") as fi:
+                    with gzip.open(gz_path, "wb") as fo:
                         fo.write(fi.read())
                 f.unlink()
                 compressed.append({"file": str(f), "compressed": str(gz_path)})
     return compressed
+
 
 def archive_to_drive(path, drive_path):
     """Archive a directory to Google Drive via rclone."""
     try:
         result = subprocess.run(
             ["rclone", "copy", str(path), f"gdrive:{drive_path}"],
-            capture_output=True, text=True, timeout=300
+            capture_output=True,
+            text=True,
+            timeout=300,
         )
         return result.returncode == 0
     except:
         return False
+
 
 def find_large_files(path, min_size_mb=100):
     """Find files larger than min_size_mb."""
@@ -101,6 +118,7 @@ def find_large_files(path, min_size_mb=100):
     except:
         pass
     return sorted(large, key=lambda x: x["size_mb"], reverse=True)
+
 
 def generate_report():
     """Generate comprehensive space report."""
@@ -119,12 +137,21 @@ def generate_report():
 
     # Check top consumers
     consumers = []
-    for d in [HOME / "MISSIONS", HOME / "CYBERTACK", HOME / ".apex_automation",
-              HOME / ".git", HOME / ".npm", HOME / ".cache", HOME / ".local"]:
+    for d in [
+        HOME / "MISSIONS",
+        HOME / "CYBERTACK",
+        HOME / ".apex_automation",
+        HOME / ".git",
+        HOME / ".npm",
+        HOME / ".cache",
+        HOME / ".local",
+    ]:
         if d.exists():
             size = get_dir_size(d)
             consumers.append({"path": str(d), "size_gb": round(size / 1e9, 1)})
-    report["top_consumers"] = sorted(consumers, key=lambda x: x["size_gb"], reverse=True)
+    report["top_consumers"] = sorted(
+        consumers, key=lambda x: x["size_gb"], reverse=True
+    )
 
     # Find large files
     report["large_files"] = find_large_files(HOME, min_size_mb=50)[:20]
@@ -132,30 +159,39 @@ def generate_report():
     # Recommendations
     data_usage = report["partitions"].get("/data", {}).get("pct", 0)
     if data_usage > 90:
-        report["recommendations"].append({
-            "priority": "HIGH",
-            "action": "Archive old MISSIONS data to Google Drive",
-            "potential_savings_gb": 10,
-        })
-        report["recommendations"].append({
-            "priority": "HIGH",
-            "action": "Compress .apex_automation/case-organized (5.6GB)",
-            "potential_savings_gb": 4,
-        })
+        report["recommendations"].append(
+            {
+                "priority": "HIGH",
+                "action": "Archive old MISSIONS data to Google Drive",
+                "potential_savings_gb": 10,
+            }
+        )
+        report["recommendations"].append(
+            {
+                "priority": "HIGH",
+                "action": "Compress .apex_automation/case-organized (5.6GB)",
+                "potential_savings_gb": 4,
+            }
+        )
 
     if data_usage > 85:
-        report["recommendations"].append({
-            "priority": "MEDIUM",
-            "action": "Clean .git history (863MB)",
-            "potential_savings_gb": 0.5,
-        })
-        report["recommendations"].append({
-            "priority": "MEDIUM",
-            "action": "Archive downloads/ to Google Drive",
-            "potential_savings_gb": 0.2,
-        })
+        report["recommendations"].append(
+            {
+                "priority": "MEDIUM",
+                "action": "Clean .git history (863MB)",
+                "potential_savings_gb": 0.5,
+            }
+        )
+        report["recommendations"].append(
+            {
+                "priority": "MEDIUM",
+                "action": "Archive downloads/ to Google Drive",
+                "potential_savings_gb": 0.2,
+            }
+        )
 
     return report
+
 
 if __name__ == "__main__":
     import sys

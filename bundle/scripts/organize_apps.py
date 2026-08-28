@@ -19,16 +19,46 @@ CATALOG = HOME / "MISSIONS/APP_CATALOG"
 STATE_PATH = HOME / ".supermemory/ops/app-organize-state.json"
 
 # Root anchors — never move
-ANCHOR_KEEP = frozenset({
-    "AGENTS.md", "MEMORY.md", "GEMINI.md", "APEX_COMMAND_CENTER", "MISSIONS",
-    "scripts", "bin", "dev", "projects", "WORKSPACE", "logs", "storage",
-    "documents", "downloads", "Desktop", "node_modules", "lib", "dist",
-    "package.json", "package-lock.json", "skills-lock.json", "SKILLS_MANIFEST.json",
-    "APEX_POINTER_INDEX.json", "APEX_MASTER_LIST.md", "ASPEN_GROVE_CONSTELLATION.json",
-    "CHAIN_LINK_BRIDGES.md", "tmp_deploy", "tmp_upgrades", "snapshots", "output",
-    "stderr.log", "stdout.log", "audit_summary.txt", "takeout_files.txt",
-    "$PREFIX", "__pycache__",
-})
+ANCHOR_KEEP = frozenset(
+    {
+        "AGENTS.md",
+        "MEMORY.md",
+        "GEMINI.md",
+        "APEX_COMMAND_CENTER",
+        "MISSIONS",
+        "scripts",
+        "bin",
+        "dev",
+        "projects",
+        "WORKSPACE",
+        "logs",
+        "storage",
+        "documents",
+        "downloads",
+        "Desktop",
+        "node_modules",
+        "lib",
+        "dist",
+        "package.json",
+        "package-lock.json",
+        "skills-lock.json",
+        "SKILLS_MANIFEST.json",
+        "APEX_POINTER_INDEX.json",
+        "APEX_MASTER_LIST.md",
+        "ASPEN_GROVE_CONSTELLATION.json",
+        "CHAIN_LINK_BRIDGES.md",
+        "tmp_deploy",
+        "tmp_upgrades",
+        "snapshots",
+        "output",
+        "stderr.log",
+        "stdout.log",
+        "audit_summary.txt",
+        "takeout_files.txt",
+        "$PREFIX",
+        "__pycache__",
+    }
+)
 
 # category_id -> (destination under MISSIONS, display name, member names/patterns)
 CATEGORIES: dict[str, dict] = {
@@ -41,16 +71,22 @@ CATEGORIES: dict[str, dict] = {
         "dest": "APEX_INFRASTRUCTURE/APPS",
         "label": "APEX Infrastructure",
         "items": [
-            "ai-agent-platform", "apex-files-android", "apex-unified-mcp",
-            "cosmic-operator-core", "everything-mcp-server",
+            "ai-agent-platform",
+            "apex-files-android",
+            "apex-unified-mcp",
+            "cosmic-operator-core",
+            "everything-mcp-server",
         ],
     },
     "colossus": {
         "dest": "APEX_INFRASTRUCTURE/COLOSSUS",
         "label": "Colossus Cluster",
         "items": [
-            "xai-colossus-2", "xai-colossus-cooling", "xai-colossus-energy",
-            "xai-colossus-nanosphere", "xai-colossus-security",
+            "xai-colossus-2",
+            "xai-colossus-cooling",
+            "xai-colossus-energy",
+            "xai-colossus-nanosphere",
+            "xai-colossus-security",
         ],
     },
     "agents": {
@@ -76,24 +112,38 @@ CATEGORIES: dict[str, dict] = {
     "memory": {
         "dest": "SUPPORTING_DATA/MEMORY_OPS",
         "label": "Memory & Knowledge Ops",
-        "items": ["mem0_client.py", "mem0_ultimate_master.py", "establish_neural_link.py"],
+        "items": [
+            "mem0_client.py",
+            "mem0_ultimate_master.py",
+            "establish_neural_link.py",
+        ],
     },
     "operator_scripts": {
         "dest": "SUPPORTING_DATA/OPERATOR_SCRIPTS",
         "label": "Operator Scripts",
         "items": [
-            "FINAL_INTEGRATION.py", "GENESIS_PRIME.py", "fileboss_stream.py",
-            "omni_daily_sweep.py", "omni_max_agent.py", "populate_pointers.py",
-            "test_dream.py", "transcribe_all_chunk_power.py", "vault_key_audit.py",
+            "FINAL_INTEGRATION.py",
+            "GENESIS_PRIME.py",
+            "fileboss_stream.py",
+            "omni_daily_sweep.py",
+            "omni_max_agent.py",
+            "populate_pointers.py",
+            "test_dream.py",
+            "transcribe_all_chunk_power.py",
+            "vault_key_audit.py",
         ],
     },
     "secrets_audit": {
         "dest": "SUPPORTING_DATA/SECRETS_AUDIT",
         "label": "Keys & Audit Artifacts",
         "items": [
-            "key_audit", "keep", "keep_export",
-            "casey_service_account.json", "glacier_service_account.json",
-            "operator_code_key_audit.json", "operator_code_key_audit_final.json",
+            "key_audit",
+            "keep",
+            "keep_export",
+            "casey_service_account.json",
+            "glacier_service_account.json",
+            "operator_code_key_audit.json",
+            "operator_code_key_audit_final.json",
             "vault_key_audit.json",
         ],
     },
@@ -101,10 +151,21 @@ CATEGORIES: dict[str, dict] = {
 
 # Already symlinked at root — catalog only, do not move
 SYMLINK_CATALOG = [
-    "CASE_STRUCTURE", "CORE_MISSION", "Casebuilder4000", "Pro-AEON-777",
-    "Pro-DOCTOR-STRANGE-Orchestrator", "Pro-God-Mind-Bridge", "Pro-apex-fs-commander",
-    "Pro-apex-fs-commander-omega", "Pro_Code", "apex-boot-core", "apex-gateway",
-    "comet-agent", "pro-code", "pro_code", "intelligence",
+    "CASE_STRUCTURE",
+    "CORE_MISSION",
+    "Casebuilder4000",
+    "Pro-AEON-777",
+    "Pro-DOCTOR-STRANGE-Orchestrator",
+    "Pro-God-Mind-Bridge",
+    "Pro-apex-fs-commander",
+    "Pro-apex-fs-commander-omega",
+    "Pro_Code",
+    "apex-boot-core",
+    "apex-gateway",
+    "comet-agent",
+    "pro-code",
+    "pro_code",
+    "intelligence",
 ]
 
 
@@ -136,12 +197,22 @@ def move_with_symlink(name: str, dest_dir: Path, dry_run: bool) -> dict:
     if not src.exists():
         return {"name": name, "action": "skip", "reason": "missing"}
     if src.is_symlink():
-        return {"name": name, "action": "skip", "reason": "already_symlink", "target": str(src.resolve())}
+        return {
+            "name": name,
+            "action": "skip",
+            "reason": "already_symlink",
+            "target": str(src.resolve()),
+        }
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / name
     if dest.exists():
-        return {"name": name, "action": "skip", "reason": "dest_exists", "dest": str(dest)}
+        return {
+            "name": name,
+            "action": "skip",
+            "reason": "dest_exists",
+            "dest": str(dest),
+        }
 
     result = {"name": name, "dest": str(dest)}
     if dry_run:
@@ -161,8 +232,7 @@ def scan_existing(dest_rel: str) -> list[str]:
     if not dest.is_dir():
         return []
     return sorted(
-        p.name for p in dest.iterdir()
-        if p.name not in (".git", "__pycache__")
+        p.name for p in dest.iterdir() if p.name not in (".git", "__pycache__")
     )
 
 
@@ -185,10 +255,12 @@ def build_catalog(moves: list[dict]) -> dict:
     for name in SYMLINK_CATALOG:
         p = HOME / name
         if p.is_symlink():
-            catalog["root_symlinks"].append({
-                "name": name,
-                "target": str(p.resolve()),
-            })
+            catalog["root_symlinks"].append(
+                {
+                    "name": name,
+                    "target": str(p.resolve()),
+                }
+            )
     catalog["anchors"] = sorted(ANCHOR_KEEP)
     catalog["last_moves"] = moves
     return catalog
@@ -229,21 +301,25 @@ def write_manifest(catalog: dict) -> None:
         tgt = s["target"].replace(str(HOME), "~")
         lines.append(f"- `{s['name']}` → `{tgt}`")
 
-    lines.extend([
-        "",
-        "## Commands",
-        "",
-        "```bash",
-        "sm-ops apps-organize              # Organize loose root apps",
-        "sm-ops apps-organize --dry-run      # Preview",
-        "sm-ops apps-organize --catalog-only # Regenerate manifest",
-        "```",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Commands",
+            "",
+            "```bash",
+            "sm-ops apps-organize              # Organize loose root apps",
+            "sm-ops apps-organize --dry-run      # Preview",
+            "sm-ops apps-organize --catalog-only # Regenerate manifest",
+            "```",
+        ]
+    )
     (CATALOG / "MANIFEST.md").write_text("\n".join(lines) + "\n")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Organize apps by category under MISSIONS")
+    parser = argparse.ArgumentParser(
+        description="Organize apps by category under MISSIONS"
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--catalog-only", action="store_true")
     args = parser.parse_args()
@@ -272,9 +348,13 @@ def main() -> int:
     write_manifest(catalog)
 
     print(f"Catalog → {CATALOG / 'MANIFEST.md'}")
-    moved = [m for m in moves if m.get("action") in ("moved+symlink", "would_move+symlink")]
+    moved = [
+        m for m in moves if m.get("action") in ("moved+symlink", "would_move+symlink")
+    ]
     skipped = [m for m in moves if m.get("action") == "skip"]
-    print(f"Processed: {len(moves)} | organized: {len(moved)} | skipped: {len(skipped)}")
+    print(
+        f"Processed: {len(moves)} | organized: {len(moved)} | skipped: {len(skipped)}"
+    )
     for m in moves:
         if m.get("action") not in ("skip",):
             print(f"  {m.get('action')}: {m['name']} → {m.get('dest', '')}")

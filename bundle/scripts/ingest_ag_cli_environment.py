@@ -11,7 +11,6 @@ Sources:
 
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -89,13 +88,17 @@ def extract_conversation_dbs() -> tuple[dict[str, tuple[str, str]], list[dict]]:
         except sqlite3.Error:
             continue
 
-        conv_meta.append({
-            "id": db.stem,
-            "mtime": datetime.fromtimestamp(db.stat().st_mtime, tz=timezone.utc).isoformat(),
-            "size_mb": round(db.stat().st_size / 1048576, 1),
-            "signal_steps": signal_steps,
-            "keys_found": len(db_keys),
-        })
+        conv_meta.append(
+            {
+                "id": db.stem,
+                "mtime": datetime.fromtimestamp(
+                    db.stat().st_mtime, tz=timezone.utc
+                ).isoformat(),
+                "size_mb": round(db.stat().st_size / 1048576, 1),
+                "signal_steps": signal_steps,
+                "keys_found": len(db_keys),
+            }
+        )
         for var, val in db_keys.items():
             if var not in keys:
                 keys[var] = (val, f"ag_cli:{db.name}")
@@ -165,41 +168,49 @@ def write_index(conv_meta: list[dict], key_count: int) -> None:
         "",
     ]
     if recent:
-        lines.extend([
-            f"- **ID:** `{recent.get('id')}`",
-            f"- **Modified:** {recent.get('mtime')}",
-            f"- **Size:** {recent.get('size_mb')} MB",
-            f"- **Steps with key/signal content:** {recent.get('signal_steps')}",
-            f"- **Unique tokens extracted:** {recent.get('keys_found')}",
+        lines.extend(
+            [
+                f"- **ID:** `{recent.get('id')}`",
+                f"- **Modified:** {recent.get('mtime')}",
+                f"- **Size:** {recent.get('size_mb')} MB",
+                f"- **Steps with key/signal content:** {recent.get('signal_steps')}",
+                f"- **Unique tokens extracted:** {recent.get('keys_found')}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Conversation archive (newest first)",
             "",
-        ])
-    lines.extend([
-        "## Conversation archive (newest first)",
-        "",
-        "| ID | Modified | MB | Keys |",
-        "|----|----------|-----|------|",
-    ])
+            "| ID | Modified | MB | Keys |",
+            "|----|----------|-----|------|",
+        ]
+    )
     for c in conv_meta[:12]:
-        lines.append(f"| `{c['id'][:8]}…` | {c['mtime'][:10]} | {c['size_mb']} | {c['keys_found']} |")
+        lines.append(
+            f"| `{c['id'][:8]}…` | {c['mtime'][:10]} | {c['size_mb']} | {c['keys_found']} |"
+        )
 
-    lines.extend([
-        "",
-        "## Gemini CLI MCP mesh (from settings.json)",
-        "",
-        "- github, gdrive, filesystem, dropbox, onedrive",
-        "- taskade, web_search, memory_systems, quantum_code_synthesis",
-        "",
-        "## Extracted keys",
-        "",
-        f"**{key_count}** canonical vars → `{EXTRACTED_KEYS}`",
-        "",
-        "## Commands",
-        "",
-        "```bash",
-        "python3 scripts/ingest_ag_cli_environment.py",
-        "sm-ops prime-keys",
-        "```",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Gemini CLI MCP mesh (from settings.json)",
+            "",
+            "- github, gdrive, filesystem, dropbox, onedrive",
+            "- taskade, web_search, memory_systems, quantum_code_synthesis",
+            "",
+            "## Extracted keys",
+            "",
+            f"**{key_count}** canonical vars → `{EXTRACTED_KEYS}`",
+            "",
+            "## Commands",
+            "",
+            "```bash",
+            "python3 scripts/ingest_ag_cli_environment.py",
+            "sm-ops prime-keys",
+            "```",
+        ]
+    )
     INDEX_MD.write_text("\n".join(lines) + "\n")
 
 

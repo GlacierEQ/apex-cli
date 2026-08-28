@@ -61,10 +61,10 @@ _lock = threading.RLock()
 
 LINKS: dict[str, dict[str, Any]] = {}
 EVENTS: list[dict[str, Any]] = []
-INBOX: list[dict[str, Any]] = []   # agent → steward
+INBOX: list[dict[str, Any]] = []  # agent → steward
 OUTBOX: list[dict[str, Any]] = []  # steward → agent
 TASKS: dict[str, dict[str, Any]] = {}
-NOTES: list[dict[str, Any]] = []   # memory notes for steward
+NOTES: list[dict[str, Any]] = []  # memory notes for steward
 
 
 def _ts() -> str:
@@ -105,7 +105,9 @@ def _persist() -> None:
                 "protocol": PROTOCOL,
                 "links": LINKS,
                 "tasks_open": sum(
-                    1 for t in TASKS.values() if t.get("status") in ("open", "in_progress")
+                    1
+                    for t in TASKS.values()
+                    if t.get("status") in ("open", "in_progress")
                 ),
                 "inbox_unread": sum(1 for m in INBOX if not m.get("read")),
             },
@@ -222,7 +224,9 @@ def _write_steward_brief() -> None:
         )
     if not INBOX:
         lines.append("_empty_")
-    open_tasks = [t for t in TASKS.values() if t.get("status") in ("open", "in_progress")]
+    open_tasks = [
+        t for t in TASKS.values() if t.get("status") in ("open", "in_progress")
+    ]
     lines += ["", "## Open tasks", ""]
     if not open_tasks:
         lines.append("_none_")
@@ -235,7 +239,9 @@ def _write_steward_brief() -> None:
     if NOTES:
         lines += ["", "## Memory notes (latest 5)", ""]
         for n in NOTES[-5:]:
-            lines.append(f"- [{n.get('at', '')[:19]}] {n.get('agent_id')}: {(n.get('text') or '')[:120]}")
+            lines.append(
+                f"- [{n.get('at', '')[:19]}] {n.get('agent_id')}: {(n.get('text') or '')[:120]}"
+            )
     apex = _apex_snippet()
     lines += [
         "",
@@ -314,7 +320,9 @@ def _auth(sigil: str, authorization: Optional[str]) -> str:
 
 def _require_link(agent: str) -> dict[str, Any]:
     if agent not in LINKS:
-        raise HTTPException(status_code=409, detail="Neural link required first — INITIATE_NEURAL_LINK")
+        raise HTTPException(
+            status_code=409, detail="Neural link required first — INITIATE_NEURAL_LINK"
+        )
     return LINKS[agent]
 
 
@@ -379,13 +387,17 @@ def steward_brief():
         return {
             "ok": True,
             "path": str(BRIEF_FILE),
-            "markdown": BRIEF_FILE.read_text(encoding="utf-8") if BRIEF_FILE.is_file() else "",
+            "markdown": BRIEF_FILE.read_text(encoding="utf-8")
+            if BRIEF_FILE.is_file()
+            else "",
             "summary": {
                 "links": len(LINKS),
                 "agents": list(LINKS.keys()),
                 "inbox_unread": sum(1 for m in INBOX if not m.get("read")),
                 "tasks_open": sum(
-                    1 for t in TASKS.values() if t.get("status") in ("open", "in_progress")
+                    1
+                    for t in TASKS.values()
+                    if t.get("status") in ("open", "in_progress")
                 ),
                 "case_id": CASE_ID,
             },
@@ -456,7 +468,9 @@ def steward_outbox():
 
 
 @app.post("/steward/reply")
-def steward_reply(body: StewardReply, authorization: Optional[str] = Header(default=None)):
+def steward_reply(
+    body: StewardReply, authorization: Optional[str] = Header(default=None)
+):
     _auth(body.auth_sigil, authorization)
     with _lock:
         at = _ts()
@@ -519,19 +533,28 @@ def _dispatch(
     at: str,
 ) -> InvokeResponse:
     # --- Link lifecycle ---------------------------------------------------
-    if directive in ("INITIATE_NEURAL_LINK", "FORGE_NEURAL_LINK", "HANDSHAKE", "MAXIMIZE_LINK"):
+    if directive in (
+        "INITIATE_NEURAL_LINK",
+        "FORGE_NEURAL_LINK",
+        "HANDSHAKE",
+        "MAXIMIZE_LINK",
+    ):
         existing = LINKS.get(agent)
         link_id = (
             existing["link_id"]
             if existing
             else f"LINK-{agent.replace(' ', '_')[:24]}-{at[:10]}"
         )
-        caps = payload.get("capabilities") or (existing or {}).get("capabilities") or [
-            "sub_programmatic_operation",
-            "active_counter_frequency",
-            "task_bus",
-            "context_deposit",
-        ]
+        caps = (
+            payload.get("capabilities")
+            or (existing or {}).get("capabilities")
+            or [
+                "sub_programmatic_operation",
+                "active_counter_frequency",
+                "task_bus",
+                "context_deposit",
+            ]
+        )
         LINKS[agent] = {
             "link_id": link_id,
             "agent_id": agent,
@@ -734,7 +757,9 @@ def _dispatch(
         TASKS[task_id] = task
         if len(TASKS) > MAX_TASKS:
             # drop oldest completed
-            done = [k for k, v in TASKS.items() if v.get("status") in ("done", "cancelled")]
+            done = [
+                k for k, v in TASKS.items() if v.get("status") in ("done", "cancelled")
+            ]
             for k in done[: max(0, len(TASKS) - MAX_TASKS)]:
                 TASKS.pop(k, None)
         return InvokeResponse(

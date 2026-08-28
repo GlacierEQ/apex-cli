@@ -11,21 +11,42 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import zipfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 HOME = Path("/data/data/com.termux/files/home")
-DEFAULT_INPUT = HOME / "MISSIONS/APEX_INFRASTRUCTURE/APEX_GEMMA_4_OMNI_NODE/processing/conversations.json"
+DEFAULT_INPUT = (
+    HOME
+    / "MISSIONS/APEX_INFRASTRUCTURE/APEX_GEMMA_4_OMNI_NODE/processing/conversations.json"
+)
 OUTPUT_ROOT = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE/CHATGPT_LIFE_RECORD"
 STATE_PATH = HOME / ".supermemory/ops/chatgpt-monthly-state.json"
 
 CASE_MARKERS = [
-    "1fdv", "1fda", "brower", "teresa", "naso", "shaw", "kekoa", "tro", "custody",
-    "family court", "kapolei", "motion", "docket", "decree", "habeas", "rico", "1983",
-    "csea", "hpd", "yamatani", "contempt", "hearing",
+    "1fdv",
+    "1fda",
+    "brower",
+    "teresa",
+    "naso",
+    "shaw",
+    "kekoa",
+    "tro",
+    "custody",
+    "family court",
+    "kapolei",
+    "motion",
+    "docket",
+    "decree",
+    "habeas",
+    "rico",
+    "1983",
+    "csea",
+    "hpd",
+    "yamatani",
+    "contempt",
+    "hearing",
 ]
 
 ACTORS = {
@@ -136,7 +157,7 @@ def classify_conv(conv: dict) -> dict:
 def write_month_index(month_dir: Path, entries: list[dict]) -> None:
     lines = [
         f"# Contemporaneous Journal — {month_dir.name}",
-        f"*Regularly kept record — Case 1FDV-23-0001009*",
+        "*Regularly kept record — Case 1FDV-23-0001009*",
         "",
         f"**Conversations:** {len(entries)}  ",
         f"**Litigation-tagged:** {sum(1 for e in entries if e['case'])}  ",
@@ -149,7 +170,9 @@ def write_month_index(month_dir: Path, entries: list[dict]) -> None:
     for e in sorted(entries, key=lambda x: x.get("ts") or 0):
         actors = ", ".join(e.get("actors") or []) or "—"
         case = "✓" if e.get("case") else ""
-        lines.append(f"| {e.get('date','?')} | {e.get('title','Untitled')[:70]} | {case} | {actors} |")
+        lines.append(
+            f"| {e.get('date', '?')} | {e.get('title', 'Untitled')[:70]} | {case} | {actors} |"
+        )
     month_dir.joinpath("INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     lit = [e for e in entries if e.get("case") or e.get("actors")]
@@ -162,7 +185,9 @@ def write_month_index(month_dir: Path, entries: list[dict]) -> None:
             lit_lines.append("")
             lit_lines.append(e.get("preview", "")[:1500])
             lit_lines.append("")
-        month_dir.joinpath("LITIGATION_HITS.md").write_text("\n".join(lit_lines) + "\n", encoding="utf-8")
+        month_dir.joinpath("LITIGATION_HITS.md").write_text(
+            "\n".join(lit_lines) + "\n", encoding="utf-8"
+        )
 
 
 def write_notion_toolkit(out: Path, stats: dict) -> None:
@@ -244,7 +269,9 @@ def run(input_path: Path, dry_run: bool = False) -> dict:
             "id": conv.get("id", ""),
             "title": (conv.get("title") or "Untitled").replace("|", "/"),
             "ts": ts or 0,
-            "date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else "?",
+            "date": datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            if ts
+            else "?",
             "case": meta["case"],
             "actors": meta["actors"],
             "preview": flatten_text(conv, 800),
@@ -256,7 +283,11 @@ def run(input_path: Path, dry_run: bool = False) -> dict:
             print(f"  processed {stats['total']:,} conversations...")
 
     if dry_run:
-        return {"stats": dict(stats["months"]), "total": stats["total"], "litigation": stats["litigation"]}
+        return {
+            "stats": dict(stats["months"]),
+            "total": stats["total"],
+            "litigation": stats["litigation"],
+        }
 
     out = OUTPUT_ROOT
     monthly_root = out / "MONTHLY"
@@ -294,7 +325,9 @@ def run(input_path: Path, dry_run: bool = False) -> dict:
     for actor, cnt in actor_counts.most_common():
         master_lines.append(f"- **{actor}:** {cnt}")
 
-    out.joinpath("MASTER_INDEX.md").write_text("\n".join(master_lines) + "\n", encoding="utf-8")
+    out.joinpath("MASTER_INDEX.md").write_text(
+        "\n".join(master_lines) + "\n", encoding="utf-8"
+    )
     write_notion_toolkit(out, stats)
 
     state = {
@@ -308,7 +341,9 @@ def run(input_path: Path, dry_run: bool = False) -> dict:
     }
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    out.joinpath("stats.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    out.joinpath("stats.json").write_text(
+        json.dumps(state, indent=2) + "\n", encoding="utf-8"
+    )
 
     return state
 
@@ -316,7 +351,9 @@ def run(input_path: Path, dry_run: bool = False) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Organize ChatGPT export by month")
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
-    parser.add_argument("--zip", type=Path, help="ChatGPT export zip (streams conversations.json)")
+    parser.add_argument(
+        "--zip", type=Path, help="ChatGPT export zip (streams conversations.json)"
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     src = args.zip or args.input

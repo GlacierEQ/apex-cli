@@ -29,7 +29,9 @@ for arg in sys.argv[1:]:
 def rclone_ls(remote: str) -> list[tuple[int, str]]:
     proc = subprocess.run(
         ["rclone", "ls", remote],
-        capture_output=True, text=True, timeout=600,
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
@@ -77,7 +79,9 @@ def main() -> int:
     case_rows = rclone_ls(CASE_REMOTE)
     zero_pdfs = [(s, p) for s, p in case_rows if s == 0 and p.lower().endswith(".pdf")]
     lib_pdf_count = sum(len(v) for v in lib_by_name.values())
-    print(f"Found {len(zero_pdfs)} zero-byte PDFs; library has {lib_pdf_count} non-empty PDFs")
+    print(
+        f"Found {len(zero_pdfs)} zero-byte PDFs; library has {lib_pdf_count} non-empty PDFs"
+    )
 
     plan: list[dict] = []
     seen_dest: set[str] = set()
@@ -94,12 +98,14 @@ def main() -> int:
             continue
         size, src_rel, remote = max(candidates, key=lambda x: x[0])
         seen_dest.add(dest_rel)
-        plan.append({
-            "dest": f"{CASE_REMOTE}/{dest_rel}",
-            "src": f"{remote}/{src_rel}",
-            "bytes": size,
-            "match": dk or "basename",
-        })
+        plan.append(
+            {
+                "dest": f"{CASE_REMOTE}/{dest_rel}",
+                "src": f"{remote}/{src_rel}",
+                "bytes": size,
+                "match": dk or "basename",
+            }
+        )
 
     print(f"Matched {len(plan)} placeholders to library PDFs")
     if LIMIT:
@@ -129,7 +135,17 @@ def main() -> int:
     }
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"ok": not errors, "copied": copied, "matched": len(plan), "report": str(REPORT)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "ok": not errors,
+                "copied": copied,
+                "matched": len(plan),
+                "report": str(REPORT),
+            },
+            indent=2,
+        )
+    )
     return 0 if not errors else 1
 
 

@@ -19,9 +19,7 @@ Integrates:
 import os
 import sys
 import subprocess
-import time
 import argparse
-import json
 from pathlib import Path
 
 HOME = Path(os.environ.get("HOME", "/data/data/com.termux/files/home"))
@@ -29,11 +27,13 @@ SCRIPTS = HOME / "scripts"
 BIN = HOME / "bin"
 GATEWAY = HOME / "apex-gateway"
 
+
 def run(cmd, background=False, **kwargs):
     print(f"[ECO] Running: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     if background:
         return subprocess.Popen(cmd, **kwargs)
     return subprocess.run(cmd, **kwargs)
+
 
 def maximize():
     print("=== MAXIMIZE ===")
@@ -43,18 +43,20 @@ def maximize():
     else:
         print("apex_helix_maximize.py not found, skipping")
 
+
 def start_daemons():
     print("=== START DAEMONS ===")
     # notion workers
     workers_daemon = SCRIPTS / "notion_workers_daemon.py"
     if workers_daemon.exists():
         run([sys.executable, str(workers_daemon), "--daemon"], background=True)
-    
+
     # other potential daemons
     for d in ["apex_chron_daemon.py"]:
         p = SCRIPTS / d
         if p.exists():
             run([sys.executable, str(p)], background=True)
+
 
 def launch_handoff():
     print("=== LAUNCH HANDOFF REPL ===")
@@ -65,19 +67,24 @@ def launch_handoff():
     else:
         print("gemma-cli not found")
 
+
 def dispatch_automation(task: str):
     print(f"=== AUTOMATION DISPATCH: {task} ===")
     # Use Nexus if available
     try:
         sys.path.insert(0, str(GATEWAY))
         from nexus_dispatch import AgenticNexus
+
         nexus = AgenticNexus()
         # Example: dispatch python executor or automation task
-        proc = nexus.dispatch("python", [str(SCRIPTS / "apex_helix_maximize.py"), "--task", task])
-        print(f"Dispatched via Nexus. Monitor with /nexus-status in REPL")
+        proc = nexus.dispatch(
+            "python", [str(SCRIPTS / "apex_helix_maximize.py"), "--task", task]
+        )
+        print("Dispatched via Nexus. Monitor with /nexus-status in REPL")
     except Exception as e:
         print(f"Nexus dispatch failed: {e}. Falling back to direct.")
         run([sys.executable, str(SCRIPTS / "apex_helix_maximize.py")])
+
 
 def token_savings_setup():
     print("=== TOKEN SAVINGS ===")
@@ -88,17 +95,19 @@ def token_savings_setup():
     # Import optimizer
     try:
         sys.path.insert(0, str(HOME / ".gemini" / "skills" / "token-savings"))
-        import apex_optimizer
         print("apex_optimizer loaded for background savings.")
     except:
         pass
+
 
 def main():
     parser = argparse.ArgumentParser(description="AI Automation Ecosystem")
     parser.add_argument("--maximize", action="store_true")
     parser.add_argument("--start-daemons", action="store_true")
     parser.add_argument("--handoff", action="store_true")
-    parser.add_argument("--automation", type=str, help="Dispatch specific automation task")
+    parser.add_argument(
+        "--automation", type=str, help="Dispatch specific automation task"
+    )
     args = parser.parse_args()
 
     token_savings_setup()
@@ -114,6 +123,7 @@ def main():
 
     if args.handoff or (not any([args.maximize, args.start_daemons, args.automation])):
         launch_handoff()
+
 
 if __name__ == "__main__":
     main()

@@ -63,12 +63,14 @@ def read_manifest_table() -> list[dict]:
             continue
         parts = [c.strip() for c in line.strip("|").split("|")]
         if len(parts) >= 4 and parts[0] and not parts[0].startswith("_"):
-            rows.append({
-                "actor": parts[0],
-                "memories": int(parts[1]) if parts[1].isdigit() else 0,
-                "plans": int(parts[2]) if parts[2].isdigit() else 0,
-                "evidence": int(parts[3]) if parts[3].isdigit() else 0,
-            })
+            rows.append(
+                {
+                    "actor": parts[0],
+                    "memories": int(parts[1]) if parts[1].isdigit() else 0,
+                    "plans": int(parts[2]) if parts[2].isdigit() else 0,
+                    "evidence": int(parts[3]) if parts[3].isdigit() else 0,
+                }
+            )
     return rows
 
 
@@ -104,7 +106,11 @@ def month_summary(month: str) -> str:
 
 def build_manifest() -> dict:
     stats = read_stats()
-    months = sorted((JOURNAL / "MONTHLY").iterdir()) if (JOURNAL / "MONTHLY").is_dir() else []
+    months = (
+        sorted((JOURNAL / "MONTHLY").iterdir())
+        if (JOURNAL / "MONTHLY").is_dir()
+        else []
+    )
     month_ids = [m.name for m in months if m.is_dir()]
     actors = read_manifest_table()
     return {
@@ -175,7 +181,11 @@ def mem0_add(text: str, dry_run: bool) -> bool:
     try:
         from mem0_ops import add as m0_add  # type: ignore
 
-        m0_add(text, agent_id=MEM0_AGENT, metadata={"source": "case-os", "case": "1FDV-23-0001009"})
+        m0_add(
+            text,
+            agent_id=MEM0_AGENT,
+            metadata={"source": "case-os", "case": "1FDV-23-0001009"},
+        )
         print("  mem0 OK: case-os summary")
         return True
     except Exception as e:
@@ -276,7 +286,12 @@ def build_notion_push_manifest() -> dict:
             for doc in ("INDEX.md", "LITIGATION_HITS.md"):
                 p = m / doc
                 if p.is_file():
-                    files.append({"file": str(p), "title": f"Journal {m.name} — {doc.replace('.md', '')}"})
+                    files.append(
+                        {
+                            "file": str(p),
+                            "title": f"Journal {m.name} — {doc.replace('.md', '')}",
+                        }
+                    )
             months.append({"month": m.name, "pages": files})
     out = {
         "at": _now(),
@@ -305,7 +320,9 @@ def notion_push(parent_id: str, month: str | None, all_months: bool) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Sync Case OS pointers across memory layers")
+    parser = argparse.ArgumentParser(
+        description="Sync Case OS pointers across memory layers"
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--notion-push", action="store_true")
     parser.add_argument("--parent", help="Notion parent page ID for push")

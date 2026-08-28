@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -17,7 +16,10 @@ CASE = HOME / "MISSIONS/THE_CATACLYSM/CASE_STRUCTURE"
 NOTION_MD = HOME / ".apex/NOTION_SURFACE.md"
 NOTION_JSON = HOME / ".apex/NOTION_SURFACE.json"
 WORKERS_MESH = HOME / ".apex/NOTION_WORKERS_MESH.json"
-CONSOLIDATE = HOME / "MISSIONS/APEX_INFRASTRUCTURE/apex-github-worker/.apex-notion-consolidate.json"
+CONSOLIDATE = (
+    HOME
+    / "MISSIONS/APEX_INFRASTRUCTURE/apex-github-worker/.apex-notion-consolidate.json"
+)
 
 ACTORS_DB = "71bc7918de324a5dbaf29e2a5f7c1e13"
 INTERACTIONS_DB = "e4f961a16ad340b09b99bacee8a3f134"
@@ -81,9 +83,18 @@ def _probe_db(db_id: str) -> dict:
             data = json.loads(resp.read())
         title = "".join(x.get("plain_text", "") for x in data.get("title", []))
         props = list(data.get("properties", {}).keys())
-        return {"ok": True, "title": title, "properties": props, "property_count": len(props)}
+        return {
+            "ok": True,
+            "title": title,
+            "properties": props,
+            "property_count": len(props),
+        }
     except urllib.error.HTTPError as e:
-        return {"ok": False, "error": f"http_{e.code}", "detail": e.read().decode("utf-8", errors="replace")[:200]}
+        return {
+            "ok": False,
+            "error": f"http_{e.code}",
+            "detail": e.read().decode("utf-8", errors="replace")[:200],
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)[:200]}
 
@@ -127,13 +138,32 @@ def distill() -> tuple[dict, str]:
             "nexus_execute": "apex_nexus_coordinator.py execute --protocol CATACLYSM",
         },
         "actor_fields": [
-            "name", "archetype", "role", "organization", "threat_level",
-            "section_1983", "rico_nexus", "shadow_faultline", "status",
+            "name",
+            "archetype",
+            "role",
+            "organization",
+            "threat_level",
+            "section_1983",
+            "rico_nexus",
+            "shadow_faultline",
+            "status",
         ],
         "interaction_fields": [
-            "summary", "event_date", "event_type", "constitutional_hook",
-            "priority", "confidence_score", "verified", "actionable", "file_name",
-            "linked_actor", "actors_involved", "source", "delivery_id", "sha256", "statute_cited",
+            "summary",
+            "event_date",
+            "event_type",
+            "constitutional_hook",
+            "priority",
+            "confidence_score",
+            "verified",
+            "actionable",
+            "file_name",
+            "linked_actor",
+            "actors_involved",
+            "source",
+            "delivery_id",
+            "sha256",
+            "statute_cited",
         ],
         "routing": {
             "legal_ingest": "nexus ingest → notion_sync push",
@@ -156,7 +186,10 @@ def distill() -> tuple[dict, str]:
             "queue": str(HOME / ".apex/notion_push_queue.jsonl"),
             "local_mesh": ["dropbox", "queue", "legal", "actors"],
             "cloud_waves": _load_json(WORKERS_MESH, {}).get("waves", []),
-            "cloud_deploy": str(HOME / "MISSIONS/APEX_INFRASTRUCTURE/notion-workers-mesh/scripts/deploy_waves.py"),
+            "cloud_deploy": str(
+                HOME
+                / "MISSIONS/APEX_INFRASTRUCTURE/notion-workers-mesh/scripts/deploy_waves.py"
+            ),
             "github_webhook": _load_json(WORKERS_MESH, {}).get("github_webhook"),
             "consolidate": _load_json(CONSOLIDATE, {}),
         },
@@ -188,7 +221,7 @@ def distill() -> tuple[dict, str]:
 | Signal | Value |
 |--------|-------|
 | API | **{api_label}** |
-| Token | {'present' if token else 'missing'} |
+| Token | {"present" if token else "missing"} |
 | Module | `integrations/notion_sync.py` |
 | Nexus | `apex_nexus_coordinator.py` |
 

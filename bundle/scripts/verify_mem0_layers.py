@@ -6,6 +6,7 @@ its credential/endpoint through the environment and performs only read-only
 requests. Missing configuration is reported as unavailable rather than replaced
 with a fallback secret.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,7 +42,9 @@ async def verify_mem0() -> bool:
     print_header("Mem0 Cloud Memory Verification")
     mem_key = _configured("MEM0_API_KEY", "MEM_API_KEY")
     if not mem_key:
-        print("⚠️ Mem0 verification skipped: MEM0_API_KEY/MEM_API_KEY is not configured.")
+        print(
+            "⚠️ Mem0 verification skipped: MEM0_API_KEY/MEM_API_KEY is not configured."
+        )
         return False
 
     url = "https://api.mem0.ai/v1/memories/?user_id=test_verification"
@@ -65,7 +68,9 @@ async def verify_neo4j() -> bool:
     neo4j_user = _configured("NEO4J_USER")
     neo4j_credential = _configured("NEO4J_PASSWORD")
     if not uri or not neo4j_user or not neo4j_credential:
-        print("⚠️ Neo4j verification skipped: URI/user/credential is not fully configured.")
+        print(
+            "⚠️ Neo4j verification skipped: URI/user/credential is not fully configured."
+        )
         return False
     if AsyncGraphDatabase is None:
         print("⚠️ Neo4j verification skipped: neo4j Python package is unavailable.")
@@ -92,7 +97,11 @@ async def verify_neo4j() -> bool:
                 result = await session.run("RETURN 1 AS ok")
                 record = await result.single()
                 passed = bool(record and record["ok"] == 1)
-                print("✅ Neo4j read-only query succeeded." if passed else "❌ Neo4j read-only query failed.")
+                print(
+                    "✅ Neo4j read-only query succeeded."
+                    if passed
+                    else "❌ Neo4j read-only query failed."
+                )
                 return passed
     except Exception as exc:
         print(f"❌ Neo4j read-only verification failed: {exc}")
@@ -115,7 +124,9 @@ async def verify_pinecone() -> bool:
                 if response.status == 200:
                     print("✅ Pinecone read-only index-stats check succeeded.")
                     return True
-                print(f"❌ Pinecone read-only index-stats check returned HTTP {response.status}.")
+                print(
+                    f"❌ Pinecone read-only index-stats check returned HTTP {response.status}."
+                )
                 return False
     except Exception as exc:
         print(f"❌ Pinecone read-only verification failed: {exc}")
@@ -143,7 +154,9 @@ async def verify_qdrant() -> bool:
                 if response.status == 200:
                     print("✅ Qdrant read-only collection check succeeded.")
                     return True
-                print(f"❌ Qdrant read-only collection check returned HTTP {response.status}.")
+                print(
+                    f"❌ Qdrant read-only collection check returned HTTP {response.status}."
+                )
                 return False
     except Exception as exc:
         print(f"❌ Qdrant read-only verification failed: {exc}")
@@ -160,7 +173,9 @@ async def main() -> None:
     labels = ("Mem0", "Pinecone", "Neo4j", "Qdrant")
     print("\n" + "=" * 60)
     for label, passed in zip(labels, results):
-        print(f"{label:10}: {'AVAILABLE' if passed else 'UNAVAILABLE / NOT CONFIGURED'}")
+        print(
+            f"{label:10}: {'AVAILABLE' if passed else 'UNAVAILABLE / NOT CONFIGURED'}"
+        )
     print("=" * 60)
 
 

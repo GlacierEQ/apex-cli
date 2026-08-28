@@ -6,7 +6,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +17,8 @@ OUT = HOME / ".apex/file_sources_access_report.json"
 
 HOT_PATHS = {
     "alpha": ALPHA,
-    "omega": HOME / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-omega",
+    "omega": HOME
+    / "MISSIONS/APEX_INFRASTRUCTURE/INFRASTRUCTURE/apex-fs-commander-omega",
     "case_root": CASE,
     "journal": CASE / "CHATGPT_LIFE_RECORD",
     "by_actor": CASE / "EVIDENCE/BY_ACTOR",
@@ -78,7 +78,11 @@ async def test_filesystem_mcp() -> list[dict]:
         ("list_directory", {"path": str(HOME / "apex-gateway")}, "[FILE]"),
         ("hash_file", {"path": str(HOME / ".apex/AGENT_BOOT.md")}, "SHA256"),
         ("read_file", {"path": str(HOME / ".apex/POINTER_INDEX.json")}, "mcp_routing"),
-        ("search_files", {"root": str(CASE), "pattern": "EVIDENCE", "max_depth": 3}, "Found"),
+        (
+            "search_files",
+            {"root": str(CASE), "pattern": "EVIDENCE", "max_depth": 3},
+            "Found",
+        ),
     ]:
         try:
             out = await mcp._dispatch(name, args)
@@ -103,23 +107,29 @@ def test_gatekeeper() -> list[dict]:
 
     try:
         h = json.loads(gk.safe_hash(str(HOME / ".apex/POINTER_INDEX.json")))
-        results.append({"tool": "gatekeeper_safe_hash", "ok": len(h.get("sha256", "")) == 64})
+        results.append(
+            {"tool": "gatekeeper_safe_hash", "ok": len(h.get("sha256", "")) == 64}
+        )
     except Exception as e:
         results.append({"tool": "gatekeeper_safe_hash", "ok": False, "error": str(e)})
 
     try:
         roots = json.loads(gk.list_case_roots())
-        results.append({
-            "tool": "gatekeeper_case_roots",
-            "ok": all(k in roots for k in ("CASE_ROOT", "EVIDENCE_ROOT", "journal")),
-        })
+        results.append(
+            {
+                "tool": "gatekeeper_case_roots",
+                "ok": all(
+                    k in roots for k in ("CASE_ROOT", "EVIDENCE_ROOT", "journal")
+                ),
+            }
+        )
     except Exception as e:
         results.append({"tool": "gatekeeper_case_roots", "ok": False, "error": str(e)})
 
     try:
         outside = json.loads(gk.safe_read("/etc/passwd", 100))
         results.append({"tool": "gatekeeper_sandbox_deny", "ok": "error" in outside})
-    except Exception as e:
+    except Exception:
         results.append({"tool": "gatekeeper_sandbox_deny", "ok": True})
 
     return results
@@ -142,7 +152,13 @@ def test_master_fs() -> list[dict]:
             else:
                 r = fs_list_directory(path)
                 ok = r.get("entries_count", 0) > 0
-            results.append({"tool": name, "ok": ok, "detail": r.get("entries_count") or r.get("size_bytes")})
+            results.append(
+                {
+                    "tool": name,
+                    "ok": ok,
+                    "detail": r.get("entries_count") or r.get("size_bytes"),
+                }
+            )
         except Exception as e:
             results.append({"tool": name, "ok": False, "error": str(e)})
     return results
@@ -158,12 +174,18 @@ def test_connector_sources() -> list[dict]:
         ("observe_script", ALPHA / "scripts/apex_observe_files.py"),
     ]
     for name, path in candidates:
-        checks.append({
-            "source": name,
-            "path": str(path),
-            "ok": path.exists(),
-            "type": "file" if path.is_file() else "dir" if path.is_dir() else "missing",
-        })
+        checks.append(
+            {
+                "source": name,
+                "path": str(path),
+                "ok": path.exists(),
+                "type": "file"
+                if path.is_file()
+                else "dir"
+                if path.is_dir()
+                else "missing",
+            }
+        )
     return checks
 
 
@@ -210,7 +232,9 @@ def main() -> int:
         "gatekeeper": gk,
         "master_mcp": master,
         "connector_sources": {"total": len(conn), "ok": conn_ok, "results": conn},
-        "all_ok": hot_ok == len(hot) and mcp_ok == len(mcp) and all(t.get("ok") for t in gk + master),
+        "all_ok": hot_ok == len(hot)
+        and mcp_ok == len(mcp)
+        and all(t.get("ok") for t in gk + master),
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2) + "\n")

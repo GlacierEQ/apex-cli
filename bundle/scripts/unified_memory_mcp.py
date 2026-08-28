@@ -55,7 +55,9 @@ async def search_unified_memory(
     layers: comma-separated (mem0,supermemory,memory_plugin,pinecone,qdrant,context7) or empty for auto-route.
     """
     layer_list = [x.strip() for x in layers.split(",") if x.strip()] or None
-    result = await search_unified(query, layers=layer_list, top_k=top_k, user_id=user_id)
+    result = await search_unified(
+        query, layers=layer_list, top_k=top_k, user_id=user_id
+    )
     return _json(result)
 
 
@@ -83,7 +85,9 @@ async def semantic_memory_router(query: str, user_id: str = "operator") -> str:
 
 
 @mcp.tool()
-async def add_mem0_fact(fact: str, account: str = "pro", user_id: str = "operator") -> str:
+async def add_mem0_fact(
+    fact: str, account: str = "pro", user_id: str = "operator"
+) -> str:
     """Add fact to Mem0 (backward-compatible with v1 MCP tool)."""
     from memory_connect_core import mem0_add
     import aiohttp
@@ -94,7 +98,9 @@ async def add_mem0_fact(fact: str, account: str = "pro", user_id: str = "operato
 
 
 @mcp.tool()
-async def search_mem0_facts(query: str, account: str = "pro", user_id: str = "operator") -> str:
+async def search_mem0_facts(
+    query: str, account: str = "pro", user_id: str = "operator"
+) -> str:
     """Search Mem0 episodic memory."""
     from memory_connect_core import mem0_search
     import aiohttp
@@ -114,7 +120,9 @@ async def search_supermemory_facts(query: str, top_k: int = 4) -> str:
 
 
 @mcp.tool()
-async def search_memory_plugin(query: str, account: str = "global", top_k: int = 4) -> str:
+async def search_memory_plugin(
+    query: str, account: str = "global", top_k: int = 4
+) -> str:
     """Search Memory Plugin cross-session store."""
     from memory_connect_core import memory_plugin_search
     import aiohttp
@@ -176,12 +184,17 @@ def list_memory_sources() -> str:
 
     layers = {}
     for group in KEY_ALIASES:
-        layers[group] = {"configured": bool(resolve_key(group)), "aliases": KEY_ALIASES[group]}
-    return _json({
-        "layers": layers,
-        "cache_entries": len(get_cache()),
-        "mesh_config": str(MESH_CONFIG) if MESH_CONFIG.is_file() else "not_built",
-    })
+        layers[group] = {
+            "configured": bool(resolve_key(group)),
+            "aliases": KEY_ALIASES[group],
+        }
+    return _json(
+        {
+            "layers": layers,
+            "cache_entries": len(get_cache()),
+            "mesh_config": str(MESH_CONFIG) if MESH_CONFIG.is_file() else "not_built",
+        }
+    )
 
 
 @mcp.tool()

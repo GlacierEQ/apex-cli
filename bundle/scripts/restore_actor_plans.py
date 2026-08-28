@@ -54,13 +54,18 @@ def main() -> int:
         restored.append("CONTINGENCY_COMPLETE_PER_ACTOR_STRATEGY.md")
 
     if PERPLEXITY_KB.is_file():
-        shutil.copy2(PERPLEXITY_KB, CURRENT_ACTORS / "PERPLEXITY_LEGAL_KNOWLEDGE_BASE.md")
+        shutil.copy2(
+            PERPLEXITY_KB, CURRENT_ACTORS / "PERPLEXITY_LEGAL_KNOWLEDGE_BASE.md"
+        )
         restored.append("PERPLEXITY_LEGAL_KNOWLEDGE_BASE.md")
 
     # Intelligence cross-refs
     intel_dir = CURRENT_ACTORS / "INTELLIGENCE"
     intel_dir.mkdir(exist_ok=True)
-    for label, src in [("yamatani_profile.md", YAMATANI_INTEL), ("brower_complete_profile.md", BROWER_PROFILE)]:
+    for label, src in [
+        ("yamatani_profile.md", YAMATANI_INTEL),
+        ("brower_complete_profile.md", BROWER_PROFILE),
+    ]:
         if src.is_file():
             shutil.copy2(src, intel_dir / label)
 
@@ -94,7 +99,9 @@ def main() -> int:
     )
 
     print(f"Restored {len(restored)} files from vault archive")
-    print(f"Cleared {relinked} stale PLANS symlinks — run: sm-ops actors --skip-supermemory")
+    print(
+        f"Cleared {relinked} stale PLANS symlinks — run: sm-ops actors --skip-supermemory"
+    )
     return 0
 
 

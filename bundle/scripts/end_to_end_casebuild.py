@@ -5,6 +5,7 @@ This script intentionally depends on two external repositories. They are supplie
 at runtime rather than hardcoded to one Termux installation, so importing the
 ``apex-cli`` repository never pretends those projects are bundled dependencies.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,7 +26,9 @@ def _require_root(path: Path, label: str) -> Path:
     return resolved
 
 
-def _load_external(casebuilder_root: Path, red_helix_root: Path) -> tuple[type[Any], type[Any], type[Any]]:
+def _load_external(
+    casebuilder_root: Path, red_helix_root: Path
+) -> tuple[type[Any], type[Any], type[Any]]:
     casebuilder_root = _require_root(casebuilder_root, "Casebuilder4000")
     red_helix_root = _require_root(red_helix_root, "Red Helix")
 
@@ -48,7 +51,8 @@ def _load_external(casebuilder_root: Path, red_helix_root: Path) -> tuple[type[A
             failures.append(f"{module_name}.{symbol_name}: {exc}")
     if failures:
         raise IntegrationDependencyError(
-            "external Casebuilder/Red Helix contract is incomplete: " + "; ".join(failures)
+            "external Casebuilder/Red Helix contract is incomplete: "
+            + "; ".join(failures)
         )
     return loaded["CaseForge"], loaded["ExhibitHasher"], loaded["AdversarialForge"]
 
@@ -59,7 +63,9 @@ def run_end_to_end(
     *,
     case_id: str = "CASE_1010_ALPHA",
 ) -> dict[str, str]:
-    CaseForge, ExhibitHasher, AdversarialForge = _load_external(casebuilder_root, red_helix_root)
+    CaseForge, ExhibitHasher, AdversarialForge = _load_external(
+        casebuilder_root, red_helix_root
+    )
     casebuilder_root = casebuilder_root.expanduser().resolve()
     red_helix_root = red_helix_root.expanduser().resolve()
 

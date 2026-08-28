@@ -7,15 +7,99 @@ import re
 VAULT_PATH = os.path.expanduser("~/.apex_vault/AGENTS/MASTER.env")
 
 CATEGORIES = {
-    "AI_LLM_CORE": ["OPENAI", "ANTHROPIC", "CLAUDE", "GEMINI", "DEEPSEEK", "GROQ", "XAI", "COHERE", "TOGETHER", "MINIMAX", "OLLAMA"],
-    "MEMORY_VECTOR": ["MEM0", "SUPERMEMORY", "PINECONE", "QDRANT", "NEO4J", "MEMORY", "REDIS", "UPSTASH", "VALKEY"],
-    "DEV_AGENT_TOOLS": ["AGENTOPS", "COMPOSIO", "MIMO", "BROWSERBASE", "E2B", "LANGCHAIN", "LETTA", "CODEGEN", "CODERABBIT", "CODY", "CURSOR", "WINDSURF"],
-    "INFRA_CLOUD": ["AWS", "VERCEL", "RAILWAY", "SUPABASE", "CLOUDFLARE", "NETLIFY", "DOCKER", "RENDER", "FIREBASE", "NEON", "MONGODB", "PRISMA"],
-    "FORENSIC_LEGAL": ["COURTLISTENER", "ZOTERO", "PDF4ME", "PDF_CO", "DOCUGENERATE", "DOCUPILOT", "PLAID", "TISANE", "NATIF"],
-    "SOCIAL_COMMS_PRODUCTIVITY": ["SLACK", "DISCORD", "NOTION", "ASANA", "CLICKUP", "AIRTABLE", "JIRA", "CONFLUENCE", "TODOIST", "MAILCHIMP", "RESEND", "TWILIO", "STRIPE"],
+    "AI_LLM_CORE": [
+        "OPENAI",
+        "ANTHROPIC",
+        "CLAUDE",
+        "GEMINI",
+        "DEEPSEEK",
+        "GROQ",
+        "XAI",
+        "COHERE",
+        "TOGETHER",
+        "MINIMAX",
+        "OLLAMA",
+    ],
+    "MEMORY_VECTOR": [
+        "MEM0",
+        "SUPERMEMORY",
+        "PINECONE",
+        "QDRANT",
+        "NEO4J",
+        "MEMORY",
+        "REDIS",
+        "UPSTASH",
+        "VALKEY",
+    ],
+    "DEV_AGENT_TOOLS": [
+        "AGENTOPS",
+        "COMPOSIO",
+        "MIMO",
+        "BROWSERBASE",
+        "E2B",
+        "LANGCHAIN",
+        "LETTA",
+        "CODEGEN",
+        "CODERABBIT",
+        "CODY",
+        "CURSOR",
+        "WINDSURF",
+    ],
+    "INFRA_CLOUD": [
+        "AWS",
+        "VERCEL",
+        "RAILWAY",
+        "SUPABASE",
+        "CLOUDFLARE",
+        "NETLIFY",
+        "DOCKER",
+        "RENDER",
+        "FIREBASE",
+        "NEON",
+        "MONGODB",
+        "PRISMA",
+    ],
+    "FORENSIC_LEGAL": [
+        "COURTLISTENER",
+        "ZOTERO",
+        "PDF4ME",
+        "PDF_CO",
+        "DOCUGENERATE",
+        "DOCUPILOT",
+        "PLAID",
+        "TISANE",
+        "NATIF",
+    ],
+    "SOCIAL_COMMS_PRODUCTIVITY": [
+        "SLACK",
+        "DISCORD",
+        "NOTION",
+        "ASANA",
+        "CLICKUP",
+        "AIRTABLE",
+        "JIRA",
+        "CONFLUENCE",
+        "TODOIST",
+        "MAILCHIMP",
+        "RESEND",
+        "TWILIO",
+        "STRIPE",
+    ],
     "GIT_REPOS": ["GITHUB", "GITLAB", "OVERLEAF", "POLYGIT"],
-    "SYSTEM_INTERNAL": ["APEX", "AG_", "CHUNK", "OLLAMA", "PROOT", "DEBUG", "LOG", "FORMAT", "TIMEOUT", "MAX_"]
+    "SYSTEM_INTERNAL": [
+        "APEX",
+        "AG_",
+        "CHUNK",
+        "OLLAMA",
+        "PROOT",
+        "DEBUG",
+        "LOG",
+        "FORMAT",
+        "TIMEOUT",
+        "MAX_",
+    ],
 }
+
 
 def get_category(key):
     for cat, markers in CATEGORIES.items():
@@ -23,40 +107,52 @@ def get_category(key):
             return cat
     return "UNCATEGORIZED_OR_MISC"
 
+
 def is_valid_key(key):
     # Strictly alphanumeric/underscore, must start with alpha
-    return re.match(r'^[A-Z][A-Z0-9_]{1,63}$', key) is not None
+    return re.match(r"^[A-Z][A-Z0-9_]{1,63}$", key) is not None
+
 
 def is_garbage_val(val):
     # Filter out values that look like code or sentences
-    if len(val) > 1000: return True
-    if val.startswith('http') and ' ' in val: return True
-    if '(' in val or ')' in val or '{' in val or '}' in val: return True
+    if len(val) > 1000:
+        return True
+    if val.startswith("http") and " " in val:
+        return True
+    if "(" in val or ")" in val or "{" in val or "}" in val:
+        return True
     return False
 
+
 def stabilize_vault():
-    if not os.path.exists(VAULT_PATH): return
+    if not os.path.exists(VAULT_PATH):
+        return
 
     raw_env = {}
-    with open(VAULT_PATH, 'r') as f:
+    with open(VAULT_PATH, "r") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith('#') or '=' not in line:
+            if not line or line.startswith("#") or "=" not in line:
                 continue
-            
+
             # Extract key/val
-            parts = line.split('=', 1)
-            key = parts[0].strip().replace('-', '_').replace('.', '_').upper()
-            
+            parts = line.split("=", 1)
+            key = parts[0].strip().replace("-", "_").replace(".", "_").upper()
+
             # Clean key from leading junk
             while key and not key[0].isalpha():
                 key = key[1:]
-            
-            if not is_valid_key(key): continue
-            
-            val = parts[1].strip().strip('"').strip("'").replace(',', '').replace(';', '')
-            if is_garbage_val(val): continue
-            if not val: continue
+
+            if not is_valid_key(key):
+                continue
+
+            val = (
+                parts[1].strip().strip('"').strip("'").replace(",", "").replace(";", "")
+            )
+            if is_garbage_val(val):
+                continue
+            if not val:
+                continue
 
             # Deduplicate: latest longest value wins
             if key in raw_env:
@@ -74,7 +170,7 @@ def stabilize_vault():
         organized[cat][key] = val
 
     # Write
-    with open(VAULT_PATH, 'w') as f:
+    with open(VAULT_PATH, "w") as f:
         f.write("# ═══════════════════════════════════════════════════════════════\n")
         f.write("#  APEX SYSTEM ENVIRONMENT CONFIG — STABILIZED MASTER VAULT\n")
         f.write(f"#  TOTAL UNIQUE KEYS: {len(raw_env)}\n")
@@ -89,6 +185,7 @@ def stabilize_vault():
                 f.write("\n")
 
     print(f"SUCCESS: Vault Stabilized. Unique keys: {len(raw_env)}")
+
 
 if __name__ == "__main__":
     stabilize_vault()
