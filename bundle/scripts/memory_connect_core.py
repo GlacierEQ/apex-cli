@@ -25,6 +25,9 @@ HOME = Path(os.environ.get("HOME", "/data/data/com.termux/files/home"))
 CACHE_DIR = HOME / ".apex_cache"
 CACHE_FILE = CACHE_DIR / "memory_hits.json"
 MESH_CONFIG = HOME / ".apex" / "MEMORY_MESH.json"
+CANONICAL_MEMORY_DIR = HOME / ".apex" / "memory" / "canonical"
+CANONICAL_MEMORY_LEDGER = HOME / ".apex" / "memory" / "canonical.jsonl"
+PROVIDER_REPAIR_QUEUE = HOME / ".apex" / "memory" / "provider_repair.jsonl"
 
 MAX_FACT_LENGTH = 1000
 SIMILARITY_THRESHOLD = 0.75
@@ -149,6 +152,129 @@ def pack_results(
     items = dedupe_items(items)
     items.sort(key=lambda x: float(x.get("score", 0)), reverse=True)
     return items[:top_k]
+
+
+# ─── Canonical preservation + federation receipts ──────────────────────────
+
+
+def classify_federation_state(
+    canonical_ok: bool,
+    provider_results: dict[str, dict[str, Any]],
+) -> str:
+    """Classify execution without turning provider unanimity into a veto."""
+    if not canonical_ok:
+        return "FAILED_CANONICAL"
+    successes = sum(1 for r in provider_results.values() if r.get("ok") is True)
+    failures = sum(1 for r in provider_results.values() if r.get("ok") is not True)
+    if successes and failures:
+        return "DEGRADED"
+    if successes:
+        return "ACTIVE"
+    return "LOCAL_ONLY"
+
+
+def canonical_commit(
+    content: str,
+    *,
+    source_id: str = "operator",
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist the full UTF-8 representation locally with independent readback.
+
+    This is deliberately labeled LOCAL. It is not a claim that Supabase or any
+    external provider has persisted the record.
+    """
+    raw = content.encode("utf-8")
+    digest = hashlib.sha256(raw).hexdigest()
+    record_id = f"sha256:{digest}"
+    CANONICAL_MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    CANONICAL_MEMORY_LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    object_path = CANONICAL_MEMORY_DIR / f"{digest}.json"
+
+    record = {
+        "record_id": record_id,
+        "sha256": digest,
+        "byte_count": len(raw),
+        "content": content,
+        "source_id": source_id,
+        "metadata": metadata or {},
+        "created_at": _now(),
+        "canonical_scope": "local_filesystem",
+        "remote_synced": False,
+    }
+
+    if not object_path.exists():
+        tmp = object_path.with_suffix(".json.tmp")
+        payload = json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+        with tmp.open("w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        tmp.replace(object_path)
+        with CANONICAL_MEMORY_LEDGER.open("a", encoding="utf-8") as ledger:
+            ledger.write(json.dumps({
+                "record_id": record_id,
+                "sha256": digest,
+                "byte_count": len(raw),
+                "source_id": source_id,
+                "object_path": str(object_path),
+                "created_at": record["created_at"],
+            }, ensure_ascii=False, sort_keys=True) + "\n")
+            ledger.flush()
+            os.fsync(ledger.fileno())
+
+    try:
+        readback = json.loads(object_path.read_text(encoding="utf-8"))
+        readback_raw = str(readback.get("content", "")).encode("utf-8")
+        readback_digest = hashlib.sha256(readback_raw).hexdigest()
+        verified = (
+            readback_digest == digest
+            and len(readback_raw) == len(raw)
+            and readback.get("record_id") == record_id
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "record_id": record_id,
+            "sha256": digest,
+            "byte_count": len(raw),
+            "canonical_scope": "local_filesystem",
+            "verified_readback": False,
+            "error": f"readback_failed:{type(exc).__name__}:{str(exc)[:120]}",
+        }
+
+    return {
+        "ok": verified,
+        "record_id": record_id,
+        "sha256": digest,
+        "byte_count": len(raw),
+        "canonical_scope": "local_filesystem",
+        "verified_readback": verified,
+        "object_path": str(object_path),
+        "remote_synced": False,
+        "truth_label": "VERIFIED_LOCAL_ONLY" if verified else "LOCAL_READBACK_FAILED",
+    }
+
+
+def queue_provider_repair(
+    canonical_receipt: dict[str, Any],
+    provider: str,
+    provider_result: dict[str, Any],
+) -> None:
+    """Queue a failed derivative write without invalidating canonical success."""
+    PROVIDER_REPAIR_QUEUE.parent.mkdir(parents=True, exist_ok=True)
+    item = {
+        "at": _now(),
+        "canonical_record_id": canonical_receipt.get("record_id"),
+        "canonical_sha256": canonical_receipt.get("sha256"),
+        "provider": provider,
+        "provider_result": provider_result,
+        "state": "PENDING_REPAIR",
+    }
+    with PROVIDER_REPAIR_QUEUE.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
 
 
 # ─── Mem0 (delegates to mem0_master_apex) ───────────────────────────────────
@@ -748,12 +874,20 @@ async def search_unified(
                 all_items.extend(items)
 
     packed = pack_results(all_items, top_k=top_k * 2)
+    failed_layers = [
+        layer for layer, items in layer_results.items()
+        if items and isinstance(items, list) and items[0].get("error")
+    ]
     return {
         "query": query,
         "layers_queried": target_layers,
         "layer_results": layer_results,
         "unified": packed,
         "count": len(packed),
+        "execution_state": "ACTIVE" if packed else "DEGRADED",
+        "degraded_layers": failed_layers,
+        "provider_unanimity_required": False,
+        "global_veto": False,
         "at": _now(),
     }
 
@@ -764,23 +898,52 @@ async def add_unified(
     targets: list[str] | None = None,
     user_id: str = "operator",
 ) -> dict[str, Any]:
+    """Canonical-first write with independent semantic-provider fan-out.
+
+    Full content is preserved in the local canonical store. Providers may receive
+    transformed/truncated derivatives according to their own adapters. A failed
+    derivative provider creates DEGRADED + repair work, never a global veto.
+    """
     source_memory_env()
-    targets = targets or ["mem0", "supermemory"]
+    selected = targets or ["mem0", "supermemory"]
+    canonical = canonical_commit(fact, source_id=user_id)
+
     results: dict[str, Any] = {}
     async with aiohttp.ClientSession() as session:
-        for t in targets:
-            if t == "mem0":
-                results["mem0"] = await mem0_add(session, fact, user_id=user_id)
-            elif t == "supermemory":
-                results["supermemory"] = await supermemory_add(fact)
-            elif t == "memory_plugin":
-                results["memory_plugin"] = await memory_plugin_add(session, fact)
+        async def write_target(target: str) -> tuple[str, dict[str, Any]]:
+            if target == "mem0":
+                return target, await mem0_add(session, fact, user_id=user_id)
+            if target == "supermemory":
+                return target, await supermemory_add(fact)
+            if target == "memory_plugin":
+                return target, await memory_plugin_add(session, fact)
+            return target, {
+                "ok": False,
+                "layer": target,
+                "error": "unsupported_write_target",
+            }
+
+        pairs = await asyncio.gather(*(write_target(t) for t in selected))
+        results = dict(pairs)
+
+    successes = [name for name, r in results.items() if r.get("ok") is True]
+    failures = [name for name, r in results.items() if r.get("ok") is not True]
+    for name in failures:
+        queue_provider_repair(canonical, name, results[name])
+
+    state = classify_federation_state(bool(canonical.get("verified_readback")), results)
     return {
-        "ok": any(r.get("ok") for r in results.values()),
+        "ok": bool(canonical.get("verified_readback")),
+        "state": state,
+        "canonical": canonical,
         "results": results,
+        "provider_successes": successes,
+        "provider_failures": failures,
+        "provider_unanimity_required": False,
+        "global_veto": False,
+        "repair_queued": len(failures),
         "at": _now(),
     }
-
 
 def _layer_live(items: list[dict[str, Any]]) -> tuple[bool, str]:
     if not items:
@@ -889,6 +1052,10 @@ async def health_check() -> dict[str, Any]:
         "layers_total": len(status["layers"]),
         "layers_live": live_count,
         "cache_entries": len(get_cache()),
+        "execution_state": "ACTIVE" if live_count else "DEGRADED",
+        "provider_unanimity_required": False,
+        "global_veto": False,
+        "failure_effect": "route_repair_continue",
     }
     return status
 
@@ -938,6 +1105,12 @@ def write_mesh_config(health: dict[str, Any]) -> Path:
         "version": "1.0",
         "at": _now(),
         "profile": "coremaximized",
+        "federation_semantics": {
+            "provider_unanimity_required": False,
+            "provider_failure_effect": "degrade_route_repair_continue",
+            "canonical_scope": "local_filesystem",
+            "canonical_truth_label": "VERIFIED_LOCAL_ONLY",
+        },
         "layers": [
             "mem0",
             "supermemory",
