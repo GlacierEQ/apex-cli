@@ -42,6 +42,33 @@ jobs:
       - name: Audit preserved legacy tree
         run: ruff check . --output-format=github
 
+  memory-federation:
+    name: Memory federation non-regression
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install focused runtime dependency
+        run: python -m pip install --upgrade aiohttp
+
+      - name: Compile memory runtime
+        run: |
+          python -m py_compile core/memory_connect_core.py
+          python -m py_compile bundle/scripts/memory_connect_core.py
+          python -m py_compile core/unified_memory_mcp.py
+
+      - name: Prove federation semantics
+        run: python -m unittest tests.test_memory_federation_semantics -v
+
   benchmark:
     name: Optional external integration benchmark
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
