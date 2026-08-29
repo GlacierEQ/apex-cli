@@ -67,7 +67,7 @@ async def add_unified_memory(
     targets: str = "mem0,supermemory",
     user_id: str = "operator",
 ) -> str:
-    """Dual/multi-write fact to selected memory layers."""
+    """Canonical-first write, then independent fan-out to selected semantic providers."""
     target_list = [x.strip() for x in targets.split(",") if x.strip()]
     result = await add_unified(fact, targets=target_list, user_id=user_id)
     return _json(result)
@@ -171,10 +171,46 @@ async def batch_add_fact(
     targets: str = "mem0,supermemory,memory_plugin",
     user_id: str = "operator",
 ) -> str:
-    """Batch-write a fact to multiple memory targets in one call."""
+    """Canonical-first batch write with independent provider receipts and repair routing."""
     target_list = [x.strip() for x in targets.split(",") if x.strip()]
     result = await add_unified(fact, targets=target_list, user_id=user_id)
     return _json(result)
+
+
+@mcp.tool()
+def get_memory_federation_status() -> str:
+    """Return non-secret canonical/federation state and pending repair counts."""
+    from memory_connect_core import (
+        CANONICAL_MEMORY_LEDGER,
+        CANONICAL_MEMORY_DIR,
+        PROVIDER_REPAIR_QUEUE,
+        MESH_CONFIG,
+    )
+
+    def line_count(path: Path) -> int:
+        if not path.is_file():
+            return 0
+        with path.open("r", encoding="utf-8", errors="ignore") as fh:
+            return sum(1 for line in fh if line.strip())
+
+    object_count = 0
+    if CANONICAL_MEMORY_DIR.is_dir():
+        object_count = sum(1 for p in CANONICAL_MEMORY_DIR.glob("*.json") if p.is_file())
+
+    return _json(
+        {
+            "execution_state": "ACTIVE",
+            "canonical_scope": "local_filesystem",
+            "canonical_truth_label": "VERIFIED_LOCAL_ONLY",
+            "canonical_objects": object_count,
+            "canonical_ledger_entries": line_count(CANONICAL_MEMORY_LEDGER),
+            "pending_provider_repairs": line_count(PROVIDER_REPAIR_QUEUE),
+            "provider_unanimity_required": False,
+            "global_veto": False,
+            "failure_effect": "degrade_route_repair_continue",
+            "mesh_config": str(MESH_CONFIG) if MESH_CONFIG.is_file() else "not_built",
+        }
+    )
 
 
 @mcp.tool()
