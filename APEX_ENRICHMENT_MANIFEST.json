@@ -1,0 +1,12 @@
+{
+  "schema": "glaciereq.apex-enrichment.v1",
+  "repo": "apex-cli",
+  "enriched_at": "2026-08-30",
+  "operator": "Casey / GlacierEQ",
+  "anti_cage": {
+    "can_override_operator": false,
+    "global_veto": false
+  },
+  "non_destructive": true,
+  "cross_links": ["FILEBOSS", "Pro-apex-fs-commander", "monolith"]
+}
