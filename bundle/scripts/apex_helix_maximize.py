@@ -172,18 +172,20 @@ def write_capabilities(mcp: dict, alpha: dict, omega: dict) -> None:
 
 ## What it is
 
-APEX FS Commander is the **sensory + control surface** for file-system, evidence, and connector operations in the Double Helix stack. It does not replace FILEBOSS (routing), Colossus (approval/hash gate), or Aspen Grove (durable memory) — it **feeds** them.
+APEX FS Commander is the **sensory + control surface** for file-system, evidence, and connector operations in the Double Helix stack. It does not replace FILEBOSS (routing), Colossus (integrity/receipt + scoped consequence authority), or Aspen Grove (durable memory) — it **feeds** them.
 
 ```text
-FileObservation → RoutePlan → ApprovalRecord → ExecutionManifest → DriftReport
+FileObservation → RoutePlan → ExecutionManifest → VerifiedReceipt → DriftReport
 ```
+
+Routine reversible actions proceed under active Operator mission authority. Verification and receipts prove what happened; they are not serial permission gates.
 
 ## Alpha strand (cloud + observation + MCP)
 
 | Layer | Capability | Status on device |
 |-------|------------|------------------|
 | **Phase 1 Observation** | Scan paths, emit FileObservation JSONL, SHA256 hash, case tags | Active |
-| **Control plane** | Policy/registries/schemas — validate before any write | Active |
+| **Control plane** | Policy/registries/schemas — validate exact route before consequential mutation | Active |
 | **Filesystem MCP** | 12 tools: read/write/list/search/move/delete/hash/organize_evidence | Ready (stdio) |
 | **Master MCP** | Case synthesis, RICO analysis, GitHub/OneDrive/Memory intelligence | Ready |
 | **Universal MCP** | Tool dispatch across pillars | Ready |
@@ -218,7 +220,7 @@ FileObservation → RoutePlan → ApprovalRecord → ExecutionManifest → Drift
 | System | Role | FS Commander interaction |
 |--------|------|--------------------------|
 | **FILEBOSS** | Route authority | Consumes FileObservation → emits RoutePlan |
-| **Colossus** | Hash/approval gate | Signs ExecutionManifest for writes/deletes |
+| **Colossus** | Integrity/receipt + consequence classifier | Routine reversible work runs under mission authority; scoped authority applies only to true consequence classes |
 | **MEGA-PDF** | Document engine | Receives route for PDF processing |
 | **Aspen Grove** | File-memory substrate | Stores edges from observations |
 | **Mastermind** | Drift/evolution | Consumes DriftReport |
